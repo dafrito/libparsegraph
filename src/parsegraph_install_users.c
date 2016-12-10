@@ -24,11 +24,11 @@ void ap_log_perror(
 
 int main(int argc, const char* const* argv)
 {
-    if(argc < 2) {
-        fprintf(stderr, "usage: generate_users <database-type> <connection-string>\n");
-        fprintf(stderr, "example: generate_users sqlite3 users.sqlite\n");
+    if(argc < 3) {
+        fprintf(stderr, "usage: parsegraph_install_users {database_type} {connection_string}");
         return -1;
     }
+
     // Initialize the APR.
     apr_status_t rv;
     rv = apr_app_initialize(&argc, &argv, NULL);
@@ -79,7 +79,7 @@ int main(int argc, const char* const* argv)
         return -1;
     }
 
-    // Destroy the pool and terminate the runtime.
+    // Destroy the pool for cleanliness.
     apr_pool_destroy(pool);
     dbd = NULL;
     pool = NULL;
@@ -88,4 +88,3 @@ int main(int argc, const char* const* argv)
 
     return 0;
 }
-

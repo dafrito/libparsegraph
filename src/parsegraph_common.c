@@ -44,8 +44,7 @@ int parsegraph_prepareStatement(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, rv, pool, "Failed preparing %s statement [%s]",
             label,
-            apr_dbd_error(dbd->driver, dbd->handle, rv),
-            NULL
+            apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
         return -1;
     }
