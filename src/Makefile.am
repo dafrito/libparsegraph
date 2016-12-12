@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libparsegraph_common.la
-libparsegraph_common_la_CFLAGS = -Wall -Werror @httpd_CFLAGS@ @openssl_CFLAGS@
+libparsegraph_common_la_CFLAGS = -Wall @httpd_CFLAGS@ @openssl_CFLAGS@
 libparsegraph_common_la_LDFLAGS = @httpd_LIBS@ @openssl_LIBS@ -shared
 
 include_HEADERS = \
@@ -36,4 +36,5 @@ runtest_SOURCES = \
 	tests/test.c \
 	tests/unity.c
 
+dist_check_SCRIPTS = tests/test_parsegraph_install_users.sh
 TESTS = $(check_PROGRAMS) tests/test_parsegraph_install_users.sh
