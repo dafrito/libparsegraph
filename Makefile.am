@@ -19,3 +19,7 @@ parsegraph_common.pc: parsegraph_common.pc.head
 	echo "parsegraph_install_users=$(bindir)/parsegraph_install_users" >>$@
 
 MOSTLYCLEANFILES = parsegraph_common.pc
+
+rpm: rpm.sh
+	bash rpm.sh
+.PHONY: rpm

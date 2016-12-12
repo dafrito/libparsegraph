@@ -30,5 +30,8 @@ PKG_CHECK_MODULES(openssl, [openssl],
     [AC_MSG_ERROR([openssl is required])]
 )
 
-AC_CONFIG_FILES([Makefile src/Makefile parsegraph_common.pc.head])
+AC_SUBST([PACKAGE_DESCRIPTION], ['This C library contains functions common to Parsegraph modules'])
+AC_SUBST([PACKAGE_SUMMARY], ['Common functions for Parsegraph'])
+
+AC_CONFIG_FILES([Makefile src/Makefile parsegraph_common.pc.head rpm.spec rpm.sh])
 AC_OUTPUT

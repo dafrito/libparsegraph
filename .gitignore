@@ -30,6 +30,7 @@ ltmain.sh
 .libs
 Makefile
 rpm.spec
+rpm.sh
 ar-lib
 test-driver
 compile
