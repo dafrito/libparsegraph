@@ -43,5 +43,5 @@ compile
 *~
 *.swp
 
-parsegraph_common.pc
-parsegraph_common.pc.head
+parsegraph_login.pc
+parsegraph_login.pc.head

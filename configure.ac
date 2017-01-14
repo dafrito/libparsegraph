@@ -1,10 +1,10 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([parsegraph_common], [1.0], [dafrito@gmail.com], [parsegraph_common], [http://www.dafrito.com])
+AC_INIT([parsegraph_login], [1.0], [dafrito@gmail.com], [parsegraph_login], [https://parsegraph.com])
 AC_SUBST([PACKAGE_RELEASE], [1])
 AM_INIT_AUTOMAKE([-Wall foreign serial-tests subdir-objects])
-AC_CONFIG_SRCDIR([src/parsegraph_common.c])
+AC_CONFIG_SRCDIR([src/login.c])
 AC_CONFIG_HEADERS([src/config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
@@ -30,8 +30,8 @@ PKG_CHECK_MODULES(openssl, [openssl],
     [AC_MSG_ERROR([openssl is required])]
 )
 
-AC_SUBST([PACKAGE_DESCRIPTION], ['This C library contains functions common to Parsegraph modules'])
-AC_SUBST([PACKAGE_SUMMARY], ['Common functions for Parsegraph'])
+AC_SUBST([PACKAGE_DESCRIPTION], ['This C library contains functions for logging in Parsegraph users'])
+AC_SUBST([PACKAGE_SUMMARY], ['User login functions for Parsegraph'])
 
-AC_CONFIG_FILES([Makefile src/Makefile parsegraph_common.pc.head rpm.spec rpm.sh])
+AC_CONFIG_FILES([Makefile src/Makefile parsegraph_login.pc.head src/rpm.spec rpm.sh])
 AC_OUTPUT
