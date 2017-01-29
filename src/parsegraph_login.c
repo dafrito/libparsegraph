@@ -37,7 +37,7 @@ int parsegraph_prepareStatement(
 
 const char* parsegraph_HasUser_QUERY = "SELECT id FROM user WHERE username = %s";
 
-const char* parsegraph_CreateUser_QUERY = "INSERT INTO user(username, password, password_salt) "
+const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) "
 "VALUES(%s, %s, %s)";
 
 const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) "
@@ -57,7 +57,7 @@ int parsegraph_prepareUserStatements(
     if(rv != 0) {
         return rv;
     }
-    rv = parsegraph_prepareStatement(pool, dbd, "CreateUser", parsegraph_CreateUser_QUERY);
+    rv = parsegraph_prepareStatement(pool, dbd, "InsertUser", parsegraph_InsertUser_QUERY);
     if(rv != 0) {
         return rv;
     }
@@ -263,11 +263,13 @@ int parsegraph_createNewUser(
     );
 
     // Insert the new user into the database.
-    apr_dbd_prepared_t* CreateUserQuery = apr_hash_get(
-        dbd->prepared, "CreateUser", APR_HASH_KEY_STRING
+    apr_dbd_prepared_t* InsertUserQuery = apr_hash_get(
+        dbd->prepared, "InsertUser", APR_HASH_KEY_STRING
     );
-    if(CreateUserQuery == NULL) {
-         // Query was not defined.
+    if(InsertUserQuery == NULL) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "InsertUser query was not defined."
+        );
         return -1;
     }
     int nrows = 0;
@@ -276,7 +278,7 @@ int parsegraph_createNewUser(
         pool,
         dbd->handle,
         &nrows,
-        CreateUserQuery,
+        InsertUserQuery,
         username,
         password_hash_encoded,
         password_salt_encoded
