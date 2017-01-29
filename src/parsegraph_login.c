@@ -36,15 +36,9 @@ int parsegraph_prepareStatement(
 }
 
 const char* parsegraph_HasUser_QUERY = "SELECT id FROM user WHERE username = %s";
-
-const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) "
-"VALUES(%s, %s, %s)";
-
-const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) "
-"VALUES(%s, %s, %s)";
-
+const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)";
+const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) VALUES(%s, %s, %s)";
 const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
-
 const char* parsegraph_RemoveUser_QUERY = "DELETE FROM user WHERE username = %s";
 
 int parsegraph_prepareUserStatements(
