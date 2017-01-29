@@ -288,7 +288,7 @@ int parsegraph_createNewUser(
     );
     if(rv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "InsertUserQuery failed to execute."
+            APLOG_MARK, APLOG_ERR, 0, pool, "InsertUser query failed to execute."
         );
         return -1;
     }
