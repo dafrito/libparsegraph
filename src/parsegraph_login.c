@@ -209,6 +209,9 @@ int parsegraph_createNewUser(
         pool, dbd, &res, username
     )) {
         // Failed to query for user.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to query for user."
+        );
         return 500;
     }
     apr_dbd_row_t* row;
@@ -221,6 +224,9 @@ int parsegraph_createNewUser(
     );
     if(dbrv == 0) {
         // New username must not already be in use.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Username must not already be in use."
+        );
         return 500;
     }
 
@@ -228,6 +234,9 @@ int parsegraph_createNewUser(
     char* password_salt = apr_palloc(pool, parsegraph_PASSWORD_SALT_LENGTH);
     if(0 != apr_generate_random_bytes((unsigned char*)password_salt, parsegraph_PASSWORD_SALT_LENGTH)) {
         // Failed to generate password salt.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate password salt."
+        );
         return 500;
     }
 
@@ -284,15 +293,21 @@ int parsegraph_createNewUser(
         password_salt_encoded
     );
     if(rv != 0) {
-        // Query failed to execute.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "InsertUserQuery failed to execute."
+        );
         return -1;
     }
     if(nrows == 0) {
-        // User was not inserted despite query.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "User was not inserted despite query."
+        );
         return -1;
     }
     if(nrows != 1) {
-        // Unexpected number of insertions.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions."
+        );
         return -1;
     }
 
@@ -306,7 +321,9 @@ int parsegraph_removeUser(
 {
     // Validate the username.
     if(!username) {
-        // New user's username must not be null.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "New user's username must not be null."
+        );
         return 500;
     }
 
