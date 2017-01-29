@@ -6,25 +6,6 @@
 #include <apr_base64.h>
 #include <http_log.h>
 
-const int parsegraph_USERNAME_MAX_LENGTH = 64;
-const int parsegraph_USERNAME_MIN_LENGTH = 3;
-const int parsegraph_PASSWORD_MIN_LENGTH = 6;
-const int parsegraph_PASSWORD_MAX_LENGTH = 255;
-const int parsegraph_PASSWORD_SALT_LENGTH = 12;
-const int parsegraph_SELECTOR_LENGTH = 32;
-const int parsegraph_TOKEN_LENGTH = 128;
-
-const char* parsegraph_HasUser_QUERY = "SELECT id FROM user WHERE username = %s";
-
-const char* parsegraph_CreateUser_QUERY = "INSERT INTO user(username, password, password_salt) "
-"VALUES(%s, %s, %s)";
-
-const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) "
-"VALUES(%s, %s, %s)";
-
-const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
-const char* parsegraph_RemoveUser_QUERY = "DELETE FROM user WHERE username = %s";
-
 int parsegraph_prepareStatement(
     apr_pool_t* pool,
     ap_dbd_t* dbd,
@@ -53,6 +34,18 @@ int parsegraph_prepareStatement(
     // Indicate success.
     return 0;
 }
+
+const char* parsegraph_HasUser_QUERY = "SELECT id FROM user WHERE username = %s";
+
+const char* parsegraph_CreateUser_QUERY = "INSERT INTO user(username, password, password_salt) "
+"VALUES(%s, %s, %s)";
+
+const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) "
+"VALUES(%s, %s, %s)";
+
+const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
+
+const char* parsegraph_RemoveUser_QUERY = "DELETE FROM user WHERE username = %s";
 
 int parsegraph_prepareUserStatements(
     apr_pool_t* pool,
@@ -124,6 +117,14 @@ int parsegraph_upgradeUserTables(
 
     return 0;
 }
+
+const int parsegraph_USERNAME_MAX_LENGTH = 64;
+const int parsegraph_USERNAME_MIN_LENGTH = 3;
+const int parsegraph_PASSWORD_MIN_LENGTH = 6;
+const int parsegraph_PASSWORD_MAX_LENGTH = 255;
+const int parsegraph_PASSWORD_SALT_LENGTH = 12;
+const int parsegraph_SELECTOR_LENGTH = 32;
+const int parsegraph_TOKEN_LENGTH = 128;
 
 int parsegraph_createNewUser(
     apr_pool_t *pool,

@@ -4,8 +4,8 @@ AC_PREREQ([2.68])
 AC_INIT([parsegraph_login], [1.0], [dafrito@gmail.com], [parsegraph_login], [https://parsegraph.com])
 AC_SUBST([PACKAGE_RELEASE], [1])
 AM_INIT_AUTOMAKE([-Wall foreign serial-tests subdir-objects])
-AC_CONFIG_SRCDIR([src/login.c])
-AC_CONFIG_HEADERS([src/config.h])
+AC_CONFIG_SRCDIR([src/parsegraph_login.c])
+AC_CONFIG_HEADERS([src/parsegraph_login_config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Check for build programs

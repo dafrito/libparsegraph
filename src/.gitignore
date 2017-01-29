@@ -1,3 +1,4 @@
 runtest
 runtest.trs
-parsegraph_install_users
+parsegraph_login_install
+parsegraph_login_config.h*

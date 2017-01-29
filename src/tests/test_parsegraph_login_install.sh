@@ -6,11 +6,11 @@ die() {
     exit 1
 }
 
-PARSEGRAPH_INSTALL_USERS=`pkg-config --variable=parsegraph_install_users parsegraph_common`
+PARSEGRAPH_LOGIN_INSTALL=`pkg-config --variable=parsegraph_login_install parsegraph_login`
 
-test -z $PARSEGRAPH_INSTALL_USERS && die "No install script was found"
+test -z $PARSEGRAPH_LOGIN_INSTALL && die "No install script was found"
 
-! test -e test_install_users.$$ || die "Install database must not already exist"
-$PARSEGRAPH_INSTALL_USERS sqlite3 test_install_users.$$ || die "Install script failed"
-test -e test_install_users.$$ || die "Installed database was not created."
-trap 'rm -f test_install_users.$$' TERM EXIT
+! test -e test_login_install.$$ || die "Install database must not already exist"
+$PARSEGRAPH_LOGIN_INSTALL sqlite3 test_login_install.$$ || die "Install script failed"
+test -e test_login_install.$$ || die "Installed database was not created."
+trap 'rm -f test_login_install.$$' TERM EXIT

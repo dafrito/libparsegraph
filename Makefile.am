@@ -16,7 +16,7 @@ parsegraph_login.pc: parsegraph_login.pc.head
 	cat $< >$@
 	echo "Libs: -L$(libdir) -lparsegraph_login $(httpd_LIBS)" >>$@
 	echo "Cflags: -I$(includedir) $(httpd_CFLAGS)" >>$@
-	echo "parsegraph_install_users=$(bindir)/parsegraph_install_users" >>$@
+	echo "parsegraph_login_install=$(bindir)/parsegraph_login_install" >>$@
 
 MOSTLYCLEANFILES = parsegraph_login.pc
 
