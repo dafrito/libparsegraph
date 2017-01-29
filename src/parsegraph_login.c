@@ -92,6 +92,7 @@ int parsegraph_upgradeUserTables(
         "create table if not exists user("
             "id integer primary key, "
             "username blob unique, "
+            "email blob, "
             "password blob, "
             "password_salt blob"
         ")"
