@@ -35,7 +35,7 @@ int parsegraph_prepareStatement(
     return 0;
 }
 
-const char* parsegraph_HasUser_QUERY = "SELECT id FROM user WHERE username = %s";
+const char* parsegraph_HasUser_QUERY = "SELECT id, password, password_salt FROM user WHERE username = %s";
 const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)";
 const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) VALUES(%s, %s, %s)";
 const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
