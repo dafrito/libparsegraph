@@ -121,7 +121,7 @@ int parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* 
         );
         return 500;
     }
-    *username_size = strlen(username);
+    *username_size = strnlen(username, parsegraph_USERNAME_MAX_LENGTH + 1);
     if(*username_size > parsegraph_USERNAME_MAX_LENGTH) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be longer than 64 characters."
@@ -177,7 +177,7 @@ int parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* 
     }
 
     // Validate the inputs.
-    *password_size = strlen(password);
+    *password_size = strnlen(password, parsegraph_PASSWORD_MAX_LENGTH + 1);
     if(*password_size > parsegraph_PASSWORD_MAX_LENGTH) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be longer than 255 characters."
