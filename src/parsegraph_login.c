@@ -235,14 +235,9 @@ int parsegraph_createNewUser(
     }
 
     // Create the password + password salt hash.
-    unsigned char* concat_password = (unsigned char*)apr_palloc(
-        pool, password_size + parsegraph_PASSWORD_SALT_LENGTH
-    );
-    memcpy(concat_password, password, password_size);
-    memcpy(concat_password + password_size, password_salt, parsegraph_PASSWORD_SALT_LENGTH);
-    char* password_hash = apr_palloc(pool, SHA256_DIGEST_LENGTH);
+    char* password_hash = apr_pcalloc(pool, SHA256_DIGEST_LENGTH + 1);
     SHA256(
-        concat_password,
+        (unsigned char*)apr_pstrcat(pool, password, password_salt, NULL),
         password_size + parsegraph_PASSWORD_SALT_LENGTH,
         (unsigned char*)password_hash
     );
