@@ -195,23 +195,17 @@ int parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* 
 }
 
 // Create a new password salt.
-int parsegraph_createPasswordSalt(apr_pool_t* pool, char** password_salt_encoded)
+int parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** password_salt_encoded)
 {
-    char* password_salt = apr_pcalloc(pool, parsegraph_PASSWORD_SALT_LENGTH + 1);
-    if(0 != apr_generate_random_bytes((unsigned char*)password_salt, parsegraph_PASSWORD_SALT_LENGTH)) {
+    char* password_salt = apr_pcalloc(pool, salt_len + 1);
+    if(0 != apr_generate_random_bytes((unsigned char*)password_salt, salt_len)) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate password salt."
         );
         return 500;
     }
-    *password_salt_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
-        parsegraph_PASSWORD_SALT_LENGTH
-    ) + 1);
-    apr_base64_encode(
-        *password_salt_encoded,
-        password_salt,
-        parsegraph_PASSWORD_SALT_LENGTH
-    );
+    *password_salt_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(salt_len) + 1);
+    apr_base64_encode(*password_salt_encoded, password_salt, salt_len);
 
     return 0;
 }
@@ -315,7 +309,7 @@ int parsegraph_createNewUser(
     }
 
     char* password_salt_encoded;
-    if(0 != parsegraph_createPasswordSalt(pool, &password_salt_encoded)) {
+    if(0 != parsegraph_createPasswordSalt(pool, parsegraph_PASSWORD_SALT_LENGTH, &password_salt_encoded)) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Passworld salt must not be null."
         );
