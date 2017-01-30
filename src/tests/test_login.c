@@ -146,7 +146,7 @@ void test_encryptPassword()
 {
     char* password_hash_encoded;
     TEST_ASSERT_EQUAL_INT(0, parsegraph_encryptPassword(pool, TEST_PASSWORD, strlen(TEST_PASSWORD),
-        &password_hash_encoded, ""));
+        &password_hash_encoded, "", 0));
 }
 
 void test_disallowInvalidUsernames()
