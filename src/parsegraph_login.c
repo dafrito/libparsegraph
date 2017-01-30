@@ -469,7 +469,7 @@ int parsegraph_beginUserLogin(
     const char* password_salt = apr_dbd_get_entry(
         dbd->driver,
         row,
-        3
+        2
     );
     if(!password_salt) {
         ap_log_perror(
