@@ -367,7 +367,8 @@ int parsegraph_beginUserLogin(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     const char* username,
-    const char* password)
+    const char* password,
+    struct parsegraph_user_login** createdLogin)
 {
     // Validate the inputs.
     if(!username) {
@@ -556,6 +557,12 @@ int parsegraph_beginUserLogin(
         return -1;
     }
 
+    if(createdLogin) {
+        *createdLogin = apr_palloc(pool, sizeof(struct parsegraph_user_login));
+        (*createdLogin)->username = apr_pstrdup(pool, username);
+        (*createdLogin)->session_selector = selector_encoded;
+        (*createdLogin)->session_token = token_encoded;
+    }
     return 0;
 }
 

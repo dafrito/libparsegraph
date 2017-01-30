@@ -87,16 +87,27 @@ int parsegraph_removeUser(
     ap_dbd_t* dbd,
     const char* username);
 
+struct parsegraph_user_login {
+    const char* username;
+    const char* session_selector;
+    const char* session_token;
+};
+
 /**
  * Begins a new user login for the given user, using the given password.
  *
  * Returns 0 on success, or a HTTP status code on failure.
+ *
+ * The createdLogin, if provided, will be pointed to the user's credentials.
+ * The struct and the strings are owned by the provided pool.
  */
 int parsegraph_beginUserLogin(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     const char* username,
-    const char* password);
+    const char* password,
+    struct parsegraph_user_login** createdLogin
+);
 
 /**
  * Returns res, allocated from the given pool, the list of all users in the
