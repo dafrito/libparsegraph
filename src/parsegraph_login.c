@@ -372,29 +372,41 @@ int parsegraph_beginUserLogin(
 {
     // Validate the inputs.
     if(!username) {
-        // New user's username must not be null.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Given username must not be null."
+        );
         return 500;
     }
     if(!password) {
-        // New user's password must not be null.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be null."
+        );
         return 500;
     }
     size_t username_size = strlen(username);
     size_t password_size = strlen(password);
     if(username_size > parsegraph_USERNAME_MAX_LENGTH) {
-        // Username must not be longer than 64 characters.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be longer than 64 characters."
+        );
         return 500;
     }
     if(username_size < parsegraph_USERNAME_MIN_LENGTH) {
-        // Username must not be shorter than 3 characters.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be shorter than 3 characters."
+        );
         return 500;
     }
     if(password_size > parsegraph_PASSWORD_MAX_LENGTH) {
-        // Password must not be longer than 255 characters.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be longer than 255 characters."
+        );
         return 500;
     }
     if(password_size < parsegraph_PASSWORD_MIN_LENGTH) {
-        // Password must not be shorter than 6 characters.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be shorter than 6 characters."
+        );
         return 500;
     }
 
@@ -402,20 +414,28 @@ int parsegraph_beginUserLogin(
         char c = username[i];
         if(i == 0) {
             if(!apr_isalpha(c)) {
-                // Username must begin with a letter.
+                ap_log_perror(
+                    APLOG_MARK, APLOG_ERR, 0, pool, "Username must begin with a letter."
+                );
                 return 500;
             }
         }
         if(apr_isspace(c)) {
-            // Username must not contain spaces.
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "Username must not contain spaces."
+            );
             return 500;
         }
         if(!apr_isascii(c)) {
-            // Username must not contain non-ASCII characters.
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "Username must not contain non-ASCII characters."
+            );
             return 500;
         }
         if(!apr_isgraph(c)) {
-            // Username must not contain non-printable characters.
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "Username must not contain non-printable characters."
+            );
             return 500;
         }
     }
@@ -425,7 +445,9 @@ int parsegraph_beginUserLogin(
     if(0 != parsegraph_hasUser(
         pool, dbd, &res, username
     )) {
-        // Failed to query for user.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to query for user."
+        );
         return 500;
     }
     apr_dbd_row_t* row;
@@ -437,7 +459,9 @@ int parsegraph_beginUserLogin(
         -1
     );
     if(dbrv != 0) {
-        // Didn't find any passwords for the given username.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Didn't find any passwords for the given username."
+        );
         return 500;
     }
 
@@ -448,7 +472,9 @@ int parsegraph_beginUserLogin(
         3
     );
     if(!password_salt) {
-        // password_salt must not be null; check DB query.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "password_salt must not be null."
+        );
         return 500;
     }
     unsigned char* md = apr_palloc(pool, SHA256_DIGEST_LENGTH);
@@ -467,7 +493,9 @@ int parsegraph_beginUserLogin(
         &user_id
     );
     if(datumrv != 0) {
-        // Failed to retrieve user_id.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve user_id."
+        );
         return 500;
     }
 
@@ -477,11 +505,15 @@ int parsegraph_beginUserLogin(
         2
     );
     if(!expected_hash) {
-        // Expected_hash must not be null; check DB query.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Expected_hash must not be null."
+        );
         return 500;
     }
     if(0 != strcmp(expected_hash, (const char*)md)) {
-        // Given password doesn't match the password in the database.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Given password doesn't match the password in the database."
+        );
         return 500;
     }
 
