@@ -142,6 +142,13 @@ void test_listUsers()
     TEST_ASSERT_EQUAL_INT(0, parsegraph_listUsers(pool, dbd, &res));
 }
 
+void test_encryptPassword()
+{
+    char* password_hash_encoded;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_encryptPassword(pool, TEST_PASSWORD, strlen(TEST_PASSWORD),
+        &password_hash_encoded, ""));
+}
+
 void test_disallowInvalidUsernames()
 {
     TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
@@ -240,6 +247,7 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_disallowInvalidPasswords);
     RUN_TEST(test_disallowInvalidUsernames);
     RUN_TEST(test_listUsers);
+    RUN_TEST(test_encryptPassword);
     RUN_TEST(test_loginActuallyWorks);
 
     // Close the DBD connection.

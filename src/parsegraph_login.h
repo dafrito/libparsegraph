@@ -129,4 +129,9 @@ int parsegraph_hasUser(
     const char* username
 );
 
+int parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size);
+int parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size);
+int parsegraph_createPasswordSalt(apr_pool_t* pool, char** password_salt_encoded);
+int parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded);
+
 #endif // parsegraph_common_INCLUDED

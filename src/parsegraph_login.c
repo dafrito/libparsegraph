@@ -37,7 +37,7 @@ int parsegraph_prepareStatement(
 
 const char* parsegraph_HasUser_QUERY = "SELECT id, password, password_salt FROM user WHERE username = %s";
 const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)";
-const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(user_id, selector, token) VALUES(%s, %s, %s)";
+const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)";
 const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
 const char* parsegraph_RemoveUser_QUERY = "DELETE FROM user WHERE username = %s";
 
@@ -101,7 +101,7 @@ int parsegraph_upgradeUserTables(
         &nrows,
         "create table if not exists login("
             "id integer primary key, "
-            "user_id integer references user(id), "
+            "username blob, "
             "selector blob, "
             "token blob"
         ")"
@@ -113,62 +113,28 @@ int parsegraph_upgradeUserTables(
     return 0;
 }
 
-const int parsegraph_USERNAME_MAX_LENGTH = 64;
-const int parsegraph_USERNAME_MIN_LENGTH = 3;
-const int parsegraph_PASSWORD_MIN_LENGTH = 6;
-const int parsegraph_PASSWORD_MAX_LENGTH = 255;
-const int parsegraph_PASSWORD_SALT_LENGTH = 12;
-const int parsegraph_SELECTOR_LENGTH = 32;
-const int parsegraph_TOKEN_LENGTH = 128;
-
-int parsegraph_createNewUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
-    const char* username,
-    const char* password)
+int parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)
 {
     if(!username) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "New user's username must not be null."
+            APLOG_MARK, APLOG_ERR, 0, pool, "username must not be null."
         );
         return 500;
     }
-    if(!password) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "New user's password must not be null."
-        );
-        return 500;
-    }
-
-    // Validate the inputs.
-    size_t username_size = strlen(username);
-    size_t password_size = strlen(password);
-    if(username_size > parsegraph_USERNAME_MAX_LENGTH) {
+    *username_size = strlen(username);
+    if(*username_size > parsegraph_USERNAME_MAX_LENGTH) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be longer than 64 characters."
         );
         return 500;
     }
-    if(username_size < parsegraph_USERNAME_MIN_LENGTH) {
+    if(*username_size < parsegraph_USERNAME_MIN_LENGTH) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be shorter than 3 characters."
         );
         return 500;
     }
-    if(password_size > parsegraph_PASSWORD_MAX_LENGTH) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be longer than 255 characters."
-        );
-        return 500;
-    }
-    if(password_size < parsegraph_PASSWORD_MIN_LENGTH) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be shorter than 6 characters."
-        );
-        return 500;
-    }
-
-    for(int i = 0; i < username_size; ++i) {
+    for(int i = 0; i < *username_size; ++i) {
         char c = username[i];
         if(i == 0) {
             if(!apr_isalpha(c)) {
@@ -198,6 +164,130 @@ int parsegraph_createNewUser(
         }
     }
 
+    return 0;
+}
+
+int parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size)
+{
+    if(!password) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "New user's password must not be null."
+        );
+        return 500;
+    }
+
+    // Validate the inputs.
+    *password_size = strlen(password);
+    if(*password_size > parsegraph_PASSWORD_MAX_LENGTH) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be longer than 255 characters."
+        );
+        return 500;
+    }
+    if(*password_size < parsegraph_PASSWORD_MIN_LENGTH) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be shorter than 6 characters."
+        );
+        return 500;
+    }
+
+    return 0;
+}
+
+// Create a new password salt.
+int parsegraph_createPasswordSalt(apr_pool_t* pool, char** password_salt_encoded)
+{
+    char* password_salt = apr_pcalloc(pool, parsegraph_PASSWORD_SALT_LENGTH + 1);
+    if(0 != apr_generate_random_bytes((unsigned char*)password_salt, parsegraph_PASSWORD_SALT_LENGTH)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate password salt."
+        );
+        return 500;
+    }
+    *password_salt_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
+        parsegraph_PASSWORD_SALT_LENGTH
+    ) + 1);
+    apr_base64_encode(
+        *password_salt_encoded,
+        password_salt,
+        parsegraph_PASSWORD_SALT_LENGTH
+    );
+
+    return 0;
+}
+
+/**
+ * Returns an encrypted hash for the given password, along with the password
+ * salt used in that hash. Both the salt and the hash are base64 encoded and null-terminated.
+ */
+int parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded)
+{
+    // Validate arguments.
+    if(!password_hash_encoded) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "password_hash_encoded must not be null."
+        );
+        return 500;
+    }
+    if(!password_salt_encoded) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "password_salt_encoded must not be null."
+        );
+        return 500;
+    }
+
+    // Create the password + password salt hash.
+    char* password_hash = apr_pcalloc(pool, SHA256_DIGEST_LENGTH + 1);
+    SHA256(
+        (unsigned char*)apr_pstrcat(pool, password, password_salt_encoded, NULL),
+        password_size + strlen(password_salt_encoded),
+        (unsigned char*)password_hash
+    );
+
+    *password_hash_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
+        SHA256_DIGEST_LENGTH
+    ) + 1);
+    apr_base64_encode(
+        *password_hash_encoded,
+        password_hash,
+        SHA256_DIGEST_LENGTH
+    );
+
+    return 0;
+}
+
+const int parsegraph_USERNAME_MAX_LENGTH = 64;
+const int parsegraph_USERNAME_MIN_LENGTH = 3;
+const int parsegraph_PASSWORD_MIN_LENGTH = 6;
+const int parsegraph_PASSWORD_MAX_LENGTH = 255;
+const int parsegraph_PASSWORD_SALT_LENGTH = 12;
+const int parsegraph_SELECTOR_LENGTH = 32;
+const int parsegraph_TOKEN_LENGTH = 128;
+
+int parsegraph_createNewUser(
+    apr_pool_t *pool,
+    ap_dbd_t* dbd,
+    const char* username,
+    const char* password)
+{
+    // Validate the username.
+    size_t username_size;
+    if(0 != parsegraph_validateUsername(pool, username, &username_size)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username to create new user."
+        );
+        return 500;
+    }
+
+    // Validate the password.
+    size_t password_size;
+    if(0 != parsegraph_validatePassword(pool, password, &password_size)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate password to create new user."
+        );
+        return 500;
+    }
+
     apr_dbd_results_t* res = NULL;
     if(0 != parsegraph_hasUser(
         pool, dbd, &res, username
@@ -224,43 +314,15 @@ int parsegraph_createNewUser(
         return 500;
     }
 
-    // Create a new password salt.
-    char* password_salt = apr_palloc(pool, parsegraph_PASSWORD_SALT_LENGTH);
-    if(0 != apr_generate_random_bytes((unsigned char*)password_salt, parsegraph_PASSWORD_SALT_LENGTH)) {
-        // Failed to generate password salt.
+    char* password_salt_encoded;
+    if(0 != parsegraph_createPasswordSalt(pool, &password_salt_encoded)) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate password salt."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Passworld salt must not be null."
         );
         return 500;
     }
-
-    // Create the password + password salt hash.
-    char* password_hash = apr_pcalloc(pool, SHA256_DIGEST_LENGTH + 1);
-    SHA256(
-        (unsigned char*)apr_pstrcat(pool, password, password_salt, NULL),
-        password_size + parsegraph_PASSWORD_SALT_LENGTH,
-        (unsigned char*)password_hash
-    );
-
-    // Encode password values.
-    char* password_salt_encoded = (char*)apr_palloc(pool, apr_base64_encode_len(
-        parsegraph_PASSWORD_SALT_LENGTH
-    ));
-    apr_base64_encode(
-        password_salt_encoded,
-        password_salt,
-        parsegraph_PASSWORD_SALT_LENGTH
-    );
-
-
-    char* password_hash_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
-        SHA256_DIGEST_LENGTH
-    ) + 1);
-    apr_base64_encode(
-        password_hash_encoded,
-        password_hash,
-        SHA256_DIGEST_LENGTH
-    );
+    char* password_hash_encoded;
+    parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded);
 
     // Insert the new user into the database.
     apr_dbd_prepared_t* InsertUserQuery = apr_hash_get(
@@ -311,9 +373,10 @@ int parsegraph_removeUser(
     const char* username)
 {
     // Validate the username.
-    if(!username) {
+    size_t username_size;
+    if(0 != parsegraph_validateUsername(pool, username, &username_size)) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "New user's username must not be null."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username."
         );
         return 500;
     }
@@ -363,6 +426,48 @@ int parsegraph_removeUser(
     return 0;
 }
 
+int parsegraph_generateLogin(apr_pool_t* pool, const char* username, struct parsegraph_user_login** createdLogin)
+{
+    // Generate the selector and token.
+    char* selector = apr_pcalloc(pool, parsegraph_SELECTOR_LENGTH);
+    if(0 != apr_generate_random_bytes((unsigned char*)selector, parsegraph_SELECTOR_LENGTH)) {
+        // Failed to generate selector.
+        return 500;
+    }
+    char* token = apr_pcalloc(pool, parsegraph_TOKEN_LENGTH);
+    if(0 != apr_generate_random_bytes((unsigned char*)token, parsegraph_TOKEN_LENGTH)) {
+        // Failed to generate selector.
+        return 500;
+    }
+
+    // Encode selector and token values.
+    char* selector_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
+        parsegraph_SELECTOR_LENGTH
+    ) + 1);
+    apr_base64_encode(
+        selector_encoded,
+        selector,
+        parsegraph_SELECTOR_LENGTH
+    );
+    char* token_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
+        parsegraph_TOKEN_LENGTH
+    ) + 1);
+    apr_base64_encode(
+        token_encoded,
+        token,
+        parsegraph_TOKEN_LENGTH
+    );
+
+    if(createdLogin) {
+        *createdLogin = apr_palloc(pool, sizeof(struct parsegraph_user_login));
+        (*createdLogin)->username = apr_pstrdup(pool, username);
+        (*createdLogin)->session_selector = selector_encoded;
+        (*createdLogin)->session_token = token_encoded;
+    }
+
+    return 0;
+}
+
 int parsegraph_beginUserLogin(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
@@ -370,74 +475,22 @@ int parsegraph_beginUserLogin(
     const char* password,
     struct parsegraph_user_login** createdLogin)
 {
-    // Validate the inputs.
-    if(!username) {
+    // Validate the username.
+    size_t username_size;
+    if(0 != parsegraph_validateUsername(pool, username, &username_size)) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Given username must not be null."
-        );
-        return 500;
-    }
-    if(!password) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be null."
-        );
-        return 500;
-    }
-    size_t username_size = strlen(username);
-    size_t password_size = strlen(password);
-    if(username_size > parsegraph_USERNAME_MAX_LENGTH) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be longer than 64 characters."
-        );
-        return 500;
-    }
-    if(username_size < parsegraph_USERNAME_MIN_LENGTH) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Username must not be shorter than 3 characters."
-        );
-        return 500;
-    }
-    if(password_size > parsegraph_PASSWORD_MAX_LENGTH) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be longer than 255 characters."
-        );
-        return 500;
-    }
-    if(password_size < parsegraph_PASSWORD_MIN_LENGTH) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password must not be shorter than 6 characters."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username."
         );
         return 500;
     }
 
-    for(int i = 0; i < username_size; ++i) {
-        char c = username[i];
-        if(i == 0) {
-            if(!apr_isalpha(c)) {
-                ap_log_perror(
-                    APLOG_MARK, APLOG_ERR, 0, pool, "Username must begin with a letter."
-                );
-                return 500;
-            }
-        }
-        if(apr_isspace(c)) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "Username must not contain spaces."
-            );
-            return 500;
-        }
-        if(!apr_isascii(c)) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "Username must not contain non-ASCII characters."
-            );
-            return 500;
-        }
-        if(!apr_isgraph(c)) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "Username must not contain non-printable characters."
-            );
-            return 500;
-        }
+    // Validate the password.
+    size_t password_size;
+    if(0 != parsegraph_validatePassword(pool, password, &password_size)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate password to create new user."
+        );
+        return 500;
     }
 
     // Check for an existing user.
@@ -465,52 +518,53 @@ int parsegraph_beginUserLogin(
         return 500;
     }
 
-    // Found username; check password.
-    const char* password_salt = apr_dbd_get_entry(
-        dbd->driver,
-        row,
-        2
-    );
-    if(!password_salt) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "password_salt must not be null."
-        );
-        return 500;
-    }
-    unsigned char* md = apr_palloc(pool, SHA256_DIGEST_LENGTH);
-    SHA256(
-        (unsigned char*)apr_pstrcat(pool, password, password_salt, NULL),
-        strlen(password) + parsegraph_PASSWORD_SALT_LENGTH,
-        md
-    );
-
     int user_id;
     apr_status_t datumrv = apr_dbd_datum_get(
         dbd->driver,
         row,
-        1,
+        0,
         APR_DBD_TYPE_INT,
         &user_id
     );
     if(datumrv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve user_id."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve username."
         );
         return 500;
     }
 
-    const char* expected_hash = apr_dbd_get_entry(
+    const char* password_salt_encoded = apr_dbd_get_entry(
         dbd->driver,
         row,
         2
     );
-    if(!expected_hash) {
+    if(!password_salt_encoded) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "password_salt_encoded must not be null."
+        );
+        return 500;
+    }
+
+    char* password_hash_encoded;
+    if(0 != parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate encrypted password."
+        );
+        return 500;
+    }
+
+    const char* expected_hash_encoded = apr_dbd_get_entry(
+        dbd->driver,
+        row,
+        1
+    );
+    if(!expected_hash_encoded) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Expected_hash must not be null."
         );
         return 500;
     }
-    if(0 != strcmp(expected_hash, (const char*)md)) {
+    if(0 != strcmp(expected_hash_encoded, (const char*)password_hash_encoded)) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Given password doesn't match the password in the database."
         );
@@ -518,6 +572,12 @@ int parsegraph_beginUserLogin(
     }
 
     // Passwords match, so create a login.
+    if(0 != parsegraph_generateLogin(pool, username, createdLogin)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate login."
+        );
+        return 500;
+    }
 
     // Insert the new login into the database.
     apr_dbd_prepared_t* BeginUserLoginQuery = apr_hash_get(
@@ -528,36 +588,6 @@ int parsegraph_beginUserLogin(
         return -1;
     }
 
-    // Generate the selector and token.
-    char* selector = apr_palloc(pool, parsegraph_SELECTOR_LENGTH);
-    if(0 != apr_generate_random_bytes((unsigned char*)selector, parsegraph_SELECTOR_LENGTH)) {
-        // Failed to generate selector.
-        return 500;
-    }
-    char* token = apr_palloc(pool, parsegraph_TOKEN_LENGTH);
-    if(0 != apr_generate_random_bytes((unsigned char*)token, parsegraph_TOKEN_LENGTH)) {
-        // Failed to generate selector.
-        return 500;
-    }
-
-    // Encode selector and token values.
-    char* selector_encoded = (char*)apr_palloc(pool, apr_base64_encode_len(
-        parsegraph_SELECTOR_LENGTH
-    ));
-    apr_base64_encode(
-        selector_encoded,
-        selector,
-        parsegraph_SELECTOR_LENGTH
-    );
-    char* token_encoded = (char*)apr_palloc(pool, apr_base64_encode_len(
-        parsegraph_TOKEN_LENGTH
-    ));
-    apr_base64_encode(
-        token_encoded,
-        token,
-        parsegraph_TOKEN_LENGTH
-    );
-
     int nrows = 0;
     int rv = apr_dbd_pvquery(
         dbd->driver,
@@ -565,10 +595,9 @@ int parsegraph_beginUserLogin(
         dbd->handle,
         &nrows,
         BeginUserLoginQuery,
-        user_id,
-        selector_encoded,
-        token_encoded,
-        NULL
+        username,
+        (*createdLogin)->session_selector,
+        (*createdLogin)->session_token
     );
     if(rv != 0) {
         ap_log_perror(
@@ -587,13 +616,6 @@ int parsegraph_beginUserLogin(
             APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions."
         );
         return -1;
-    }
-
-    if(createdLogin) {
-        *createdLogin = apr_palloc(pool, sizeof(struct parsegraph_user_login));
-        (*createdLogin)->username = apr_pstrdup(pool, username);
-        (*createdLogin)->session_selector = selector_encoded;
-        (*createdLogin)->session_token = token_encoded;
     }
     return 0;
 }
