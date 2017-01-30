@@ -214,7 +214,7 @@ int parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** pass
  * Returns an encrypted hash for the given password, along with the password
  * salt used in that hash. Both the salt and the hash are base64 encoded and null-terminated.
  */
-int parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_size)
+int parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)
 {
     // Validate arguments.
     if(!password_hash_encoded) {
@@ -230,14 +230,14 @@ int parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t pa
         return 500;
     }
 
-    char* password_hash_input = apr_pcalloc(pool, password_size + password_salt_size);
+    char* password_hash_input = apr_pcalloc(pool, password_size + password_salt_encoded_size);
     memcpy(password_hash_input, password, password_size);
-    memcpy(password_hash_input + password_size, password_salt_encoded, password_salt_size);
+    memcpy(password_hash_input + password_size, password_salt_encoded, password_salt_encoded_size);
 
     char* password_hash = apr_pcalloc(pool, SHA256_DIGEST_LENGTH);
     SHA256(
         (unsigned char*)password_hash_input,
-        password_size + password_salt_size,
+        password_size + password_salt_encoded_size,
         (unsigned char*)password_hash
     );
 
