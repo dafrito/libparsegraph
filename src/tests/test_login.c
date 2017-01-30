@@ -63,6 +63,30 @@ void test_createNewUser()
     ));
 }
 
+void test_loginActuallyWorks()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+
+    struct parsegraph_user_login* createdLogin;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_beginUserLogin(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD,
+        &createdLogin
+    ));
+}
+
 void test_disallowInvalidPasswords()
 {
     TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
@@ -216,6 +240,7 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_disallowInvalidPasswords);
     RUN_TEST(test_disallowInvalidUsernames);
     RUN_TEST(test_listUsers);
+    RUN_TEST(test_loginActuallyWorks);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);
