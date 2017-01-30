@@ -256,9 +256,11 @@ int parsegraph_createNewUser(
         password_salt,
         parsegraph_PASSWORD_SALT_LENGTH
     );
-    char* password_hash_encoded = (char*)apr_palloc(pool, apr_base64_encode_len(
-        password_size + parsegraph_PASSWORD_SALT_LENGTH
-    ));
+
+
+    char* password_hash_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(
+        SHA256_DIGEST_LENGTH
+    ) + 1);
     apr_base64_encode(
         password_hash_encoded,
         password_hash,
