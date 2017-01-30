@@ -197,7 +197,7 @@ int parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* 
 // Create a new password salt.
 int parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** password_salt_encoded)
 {
-    char* password_salt = apr_pcalloc(pool, salt_len + 1);
+    char* password_salt = apr_pcalloc(pool, salt_len);
     if(0 != apr_generate_random_bytes((unsigned char*)password_salt, salt_len)) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate password salt."
