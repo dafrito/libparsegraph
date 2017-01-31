@@ -38,6 +38,7 @@ int parsegraph_prepareStatement(
 const char* parsegraph_HasUser_QUERY = "SELECT id, password, password_salt FROM user WHERE username = %s";
 const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)";
 const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)";
+const char* parsegraph_EndUserLogin_QUERY = "DELETE FROM login WHERE username = %s";
 const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
 const char* parsegraph_RemoveUser_QUERY = "DELETE FROM user WHERE username = %s";
 
@@ -56,6 +57,10 @@ int parsegraph_prepareUserStatements(
         return rv;
     }
     rv = parsegraph_prepareStatement(pool, dbd, "BeginUserLogin", parsegraph_BeginUserLogin_QUERY);
+    if(rv != 0) {
+        return rv;
+    }
+    rv = parsegraph_prepareStatement(pool, dbd, "EndUserLogin", parsegraph_EndUserLogin_QUERY);
     if(rv != 0) {
         return rv;
     }
@@ -379,6 +384,14 @@ int parsegraph_removeUser(
         return 500;
     }
 
+    size_t logins_ended;
+    if(0 != parsegraph_endUserLogin(pool, dbd, username, &logins_ended)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to end user logins."
+        );
+        return 500;
+    }
+
     // Remove the user.
     apr_dbd_prepared_t* RemoveUserQuery = apr_hash_get(
         dbd->prepared, "RemoveUser", APR_HASH_KEY_STRING
@@ -615,6 +628,52 @@ int parsegraph_beginUserLogin(
         );
         return -1;
     }
+    return 0;
+}
+
+int parsegraph_endUserLogin(
+    apr_pool_t *pool,
+    ap_dbd_t* dbd,
+    const char* username,
+    size_t* logins_ended
+)
+{
+    // Validate the username.
+    size_t username_size;
+    if(0 != parsegraph_validateUsername(pool, username, &username_size)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username."
+        );
+        return 500;
+    }
+
+    // Remove the login into the database.
+    apr_dbd_prepared_t* EndUserLoginQuery = apr_hash_get(
+        dbd->prepared, "EndUserLogin", APR_HASH_KEY_STRING
+    );
+    if(EndUserLoginQuery == NULL) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "EndUserLoginQuery was not defined."
+        );
+        return -1;
+    }
+
+    int nrows = 0;
+    int rv = apr_dbd_pvquery(
+        dbd->driver,
+        pool,
+        dbd->handle,
+        &nrows,
+        EndUserLoginQuery,
+        username
+    );
+    if(rv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Query failed to execute."
+        );
+        return -1;
+    }
+    *logins_ended = nrows;
     return 0;
 }
 

@@ -45,6 +45,7 @@ extern const char* parsegraph_HasUser_QUERY;
  */
 extern const char* parsegraph_CreateUser_QUERY;
 extern const char* parsegraph_BeginUserLogin_QUERY;
+extern const char* parsegraph_EndUserLogin_QUERY;
 extern const char* parsegraph_ListUsers_QUERY;
 extern const char* parsegraph_RemoveUser_QUERY;
 
@@ -107,6 +108,13 @@ int parsegraph_beginUserLogin(
     const char* username,
     const char* password,
     struct parsegraph_user_login** createdLogin
+);
+
+int parsegraph_endUserLogin(
+    apr_pool_t *pool,
+    ap_dbd_t* dbd,
+    const char* username,
+    size_t* logins_ended
 );
 
 /**
