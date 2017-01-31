@@ -729,3 +729,52 @@ int parsegraph_hasUser(
         username
     );
 }
+
+int parsegraph_getIDForUsername(
+    apr_pool_t *pool,
+    ap_dbd_t* dbd,
+    const char* username,
+    int* user_id)
+{
+    apr_dbd_results_t* res = NULL;
+    if(0 != parsegraph_hasUser(
+        pool, dbd, &res, username
+    )) {
+        // Failed to query for user.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to query for user."
+        );
+        return 500;
+    }
+
+    apr_dbd_row_t* row;
+    int dbrv = apr_dbd_get_row(
+        dbd->driver,
+        pool,
+        res,
+        &row,
+        -1
+    );
+    if(dbrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Username not found."
+        );
+        return 404;
+    }
+
+    apr_status_t datumrv = apr_dbd_datum_get(
+        dbd->driver,
+        row,
+        0,
+        APR_DBD_TYPE_INT,
+        user_id
+    );
+    if(datumrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve ID for username."
+        );
+        return 500;
+    }
+
+    return 0;
+}
