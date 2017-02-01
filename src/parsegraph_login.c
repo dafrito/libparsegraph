@@ -384,6 +384,7 @@ int parsegraph_removeUser(
         return 500;
     }
 
+    // End existing user logins.
     size_t logins_ended;
     if(0 != parsegraph_endUserLogin(pool, dbd, username, &logins_ended)) {
         ap_log_perror(
