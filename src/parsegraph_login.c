@@ -385,8 +385,7 @@ int parsegraph_removeUser(
         dbd->handle,
         &nrows,
         query,
-        username,
-        NULL
+        username
     );
 
     // Confirm removal result.
