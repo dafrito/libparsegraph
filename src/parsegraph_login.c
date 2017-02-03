@@ -12,7 +12,7 @@ int parsegraph_prepareLoginStatements(
 )
 {
     static const char* queries[] = {
-        "parsegraph_login_hasUser", "SELECT id, password, password_salt FROM user WHERE username = %s", // 1
+        "parsegraph_login_getUser", "SELECT id, password, password_salt FROM user WHERE username = %s", // 1
         "parsegraph_login_createNewUser", "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)", // 2
         "parsegraph_login_beginUserLogin", "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)", // 3
         "parsegraph_login_endUserLogin", "DELETE FROM login WHERE username = %s", // 4
@@ -263,7 +263,7 @@ int parsegraph_createNewUser(
     }
 
     apr_dbd_results_t* res = NULL;
-    if(0 != parsegraph_hasUser(
+    if(0 != parsegraph_getUser(
         pool, dbd, &res, username
     )) {
         // Failed to query for user.
@@ -481,7 +481,7 @@ int parsegraph_beginUserLogin(
 
     // Check for an existing user.
     apr_dbd_results_t* res = NULL;
-    if(0 != parsegraph_hasUser(
+    if(0 != parsegraph_getUser(
         pool, dbd, &res, username
     )) {
         ap_log_perror(
@@ -674,14 +674,14 @@ int parsegraph_listUsers(
     );
 }
 
-int parsegraph_hasUser(
+int parsegraph_getUser(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     apr_dbd_results_t** res,
     const char* username)
 {
     // Get and run the query.
-    const char* queryName = "parsegraph_login_hasUser";
+    const char* queryName = "parsegraph_login_getUser";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -710,7 +710,7 @@ int parsegraph_getIDForUsername(
     int* user_id)
 {
     apr_dbd_results_t* res = NULL;
-    if(0 != parsegraph_hasUser(
+    if(0 != parsegraph_getUser(
         pool, dbd, &res, username
     )) {
         // Failed to query for user.

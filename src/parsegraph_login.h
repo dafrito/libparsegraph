@@ -37,7 +37,7 @@ extern const int parsegraph_PASSWORD_SALT_LENGTH;
  *
  * "SELECT user_id FROM user WHERE username = %s"
  */
-extern const char* parsegraph_HasUser_QUERY;
+extern const char* parsegraph_GetUser_QUERY;
 
 /**
  * "INSERT INTO user(username, password, password_salt) "
@@ -130,7 +130,7 @@ int parsegraph_listUsers(
 /**
  * Returns whether the named user is in the given database.
  */
-int parsegraph_hasUser(
+int parsegraph_getUser(
     apr_pool_t *pool,
     ap_dbd_t* dbd_handle,
     apr_dbd_results_t** res,
