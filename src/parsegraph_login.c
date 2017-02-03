@@ -281,13 +281,14 @@ int parsegraph_createNewUser(
         -1
     );
     if(dbrv == 0) {
-        // New username must not already be in use.
+        // User already exists.
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Username must not already be in use."
         );
         return 500;
     }
 
+    // Generate the encrypted password.
     char* password_salt_encoded;
     if(0 != parsegraph_createPasswordSalt(pool, parsegraph_PASSWORD_SALT_LENGTH, &password_salt_encoded)) {
         ap_log_perror(
