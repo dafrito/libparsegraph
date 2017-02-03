@@ -58,7 +58,7 @@ int parsegraph_prepareStatement(
 /**
  * Insert any missing SQL queries for the User module with provided defaults.
  */
-int parsegraph_prepareUserStatements(
+int parsegraph_prepareLoginStatements(
     apr_pool_t *pool,
     ap_dbd_t* dbd);
 
@@ -114,7 +114,7 @@ int parsegraph_endUserLogin(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     const char* username,
-    size_t* logins_ended
+    int* logins_ended
 );
 
 /**

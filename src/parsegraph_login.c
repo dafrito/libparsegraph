@@ -6,74 +6,45 @@
 #include <apr_base64.h>
 #include <http_log.h>
 
-int parsegraph_prepareStatement(
-    apr_pool_t* pool,
-    ap_dbd_t* dbd,
-    const char* label,
-    const char* query)
-{
-    // Check if the statement has already been created.
-    if(NULL != apr_hash_get(dbd->prepared, label, APR_HASH_KEY_STRING)) {
-        // A statement already prepared is ignored.
-        return 0;
-    }
-
-    // No statement was found, so create and insert a new statement.
-    apr_dbd_prepared_t *stmt;
-    int rv = apr_dbd_prepare(dbd->driver, pool, dbd->handle, query, label, &stmt);
-    if(rv) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, rv, pool, "Failed preparing %s statement [%s]",
-            label,
-            apr_dbd_error(dbd->driver, dbd->handle, rv)
-        );
-        return -1;
-    }
-    apr_hash_set(dbd->prepared, label, APR_HASH_KEY_STRING, stmt);
-
-    // Indicate success.
-    return 0;
-}
-
-const char* parsegraph_HasUser_QUERY = "SELECT id, password, password_salt FROM user WHERE username = %s";
-const char* parsegraph_InsertUser_QUERY = "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)";
-const char* parsegraph_BeginUserLogin_QUERY = "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)";
-const char* parsegraph_EndUserLogin_QUERY = "DELETE FROM login WHERE username = %s";
-const char* parsegraph_ListUsers_QUERY = "SELECT id, username FROM user";
-const char* parsegraph_RemoveUser_QUERY = "DELETE FROM user WHERE username = %s";
-
-int parsegraph_prepareUserStatements(
+int parsegraph_prepareLoginStatements(
     apr_pool_t* pool,
     ap_dbd_t* dbd
 )
 {
-    int rv;
-    rv = parsegraph_prepareStatement(pool, dbd, "HasUser", parsegraph_HasUser_QUERY);
-    if(rv != 0) {
-        return rv;
-    }
-    rv = parsegraph_prepareStatement(pool, dbd, "InsertUser", parsegraph_InsertUser_QUERY);
-    if(rv != 0) {
-        return rv;
-    }
-    rv = parsegraph_prepareStatement(pool, dbd, "BeginUserLogin", parsegraph_BeginUserLogin_QUERY);
-    if(rv != 0) {
-        return rv;
-    }
-    rv = parsegraph_prepareStatement(pool, dbd, "EndUserLogin", parsegraph_EndUserLogin_QUERY);
-    if(rv != 0) {
-        return rv;
-    }
-    rv = parsegraph_prepareStatement(pool, dbd, "ListUsers", parsegraph_ListUsers_QUERY);
-    if(rv != 0) {
-        return rv;
-    }
-    rv = parsegraph_prepareStatement(pool, dbd, "RemoveUser", parsegraph_RemoveUser_QUERY);
-    if(rv != 0) {
-        return rv;
+    static const char* queries[] = {
+        "parsegraph_login_hasUser", "SELECT id, password, password_salt FROM user WHERE username = %s", // 1
+        "parsegraph_login_createNewUser", "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)", // 2
+        "parsegraph_login_beginUserLogin", "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)", // 3
+        "parsegraph_login_endUserLogin", "DELETE FROM login WHERE username = %s", // 4
+        "parsegraph_login_listUsers", "SELECT id, username FROM user", // 5
+        "parsegraph_login_removeUser", "DELETE FROM user WHERE username = %s" // 6
+    };
+
+    for(int i = 0; i < 6 * 2; i += 2) {
+        const char* label = queries[i];
+        const char* query = queries[i + 1];
+
+        // Check if the statement has already been created.
+        if(NULL != apr_hash_get(dbd->prepared, label, APR_HASH_KEY_STRING)) {
+            // A statement already prepared is ignored.
+            return 0;
+        }
+
+        // No statement was found, so create and insert a new statement.
+        apr_dbd_prepared_t *stmt;
+        int rv = apr_dbd_prepare(dbd->driver, pool, dbd->handle, query, label, &stmt);
+        if(rv) {
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, rv, pool, "Failed preparing %s statement [%s]",
+                label,
+                apr_dbd_error(dbd->driver, dbd->handle, rv)
+            );
+            return -1;
+        }
+        apr_hash_set(dbd->prepared, label, APR_HASH_KEY_STRING, stmt);
     }
 
-    return rv;
+    return 0;
 }
 
 int parsegraph_upgradeUserTables(
@@ -328,12 +299,13 @@ int parsegraph_createNewUser(
     parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded));
 
     // Insert the new user into the database.
-    apr_dbd_prepared_t* InsertUserQuery = apr_hash_get(
-        dbd->prepared, "InsertUser", APR_HASH_KEY_STRING
+    const char* queryName = "parsegraph_login_createNewUser";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
-    if(InsertUserQuery == NULL) {
+    if(query == NULL) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "InsertUser query was not defined."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
         );
         return -1;
     }
@@ -343,26 +315,26 @@ int parsegraph_createNewUser(
         pool,
         dbd->handle,
         &nrows,
-        InsertUserQuery,
+        query,
         username,
         password_hash_encoded,
         password_salt_encoded
     );
     if(rv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "InsertUser query failed to execute."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute.", queryName
         );
         return -1;
     }
     if(nrows == 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "User was not inserted despite query."
+            APLOG_MARK, APLOG_ERR, 0, pool, "User %s was not inserted despite query.", username
         );
         return -1;
     }
     if(nrows != 1) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions for %s: %d insertion(s).", username, nrows
         );
         return -1;
     }
@@ -385,7 +357,7 @@ int parsegraph_removeUser(
     }
 
     // End existing user logins.
-    size_t logins_ended;
+    int logins_ended;
     if(0 != parsegraph_endUserLogin(pool, dbd, username, &logins_ended)) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Failed to end user logins."
@@ -394,12 +366,14 @@ int parsegraph_removeUser(
     }
 
     // Remove the user.
-    apr_dbd_prepared_t* RemoveUserQuery = apr_hash_get(
-        dbd->prepared, "RemoveUser", APR_HASH_KEY_STRING
+    const char* queryName = "parsegraph_login_removeUser";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
-    if(RemoveUserQuery == NULL) {
+    if(query == NULL) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "RemoveUser query was not defined."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+            queryName
         );
         return -1;
     }
@@ -409,7 +383,7 @@ int parsegraph_removeUser(
         pool,
         dbd->handle,
         &nrows,
-        RemoveUserQuery,
+        query,
         username,
         NULL
     );
@@ -592,11 +566,15 @@ int parsegraph_beginUserLogin(
     }
 
     // Insert the new login into the database.
-    apr_dbd_prepared_t* BeginUserLoginQuery = apr_hash_get(
-        dbd->prepared, "BeginUserLogin", APR_HASH_KEY_STRING
+    const char* queryName = "parsegraph_login_beginUserLogin";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
-    if(BeginUserLoginQuery == NULL) {
+    if(query == NULL) {
          // Query was not defined.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
+        );
         return -1;
     }
 
@@ -606,26 +584,26 @@ int parsegraph_beginUserLogin(
         pool,
         dbd->handle,
         &nrows,
-        BeginUserLoginQuery,
+        query,
         username,
         (*createdLogin)->session_selector,
         (*createdLogin)->session_token
     );
     if(rv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Query failed to execute."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute.", queryName
         );
         return -1;
     }
     if(nrows == 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Login was not inserted despite query."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Login for %s was not inserted despite query.", username
         );
         return -1;
     }
     if(nrows != 1) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions for %s. Got %d insertion(s)", username, nrows
         );
         return -1;
     }
@@ -636,7 +614,7 @@ int parsegraph_endUserLogin(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     const char* username,
-    size_t* logins_ended
+    int* logins_ended
 )
 {
     // Validate the username.
@@ -649,33 +627,25 @@ int parsegraph_endUserLogin(
     }
 
     // Remove the login into the database.
-    apr_dbd_prepared_t* EndUserLoginQuery = apr_hash_get(
-        dbd->prepared, "EndUserLogin", APR_HASH_KEY_STRING
+    const char* queryName = "parsegraph_login_endUserLogin";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
-    if(EndUserLoginQuery == NULL) {
+    if(query == NULL) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "EndUserLoginQuery was not defined."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
         );
         return -1;
     }
 
-    int nrows = 0;
-    int rv = apr_dbd_pvquery(
+    return apr_dbd_pvquery(
         dbd->driver,
         pool,
         dbd->handle,
-        &nrows,
-        EndUserLoginQuery,
+        logins_ended,
+        query,
         username
     );
-    if(rv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Query failed to execute."
-        );
-        return -1;
-    }
-    *logins_ended = nrows;
-    return 0;
 }
 
 int parsegraph_listUsers(
@@ -684,12 +654,13 @@ int parsegraph_listUsers(
     apr_dbd_results_t** res)
 {
     // Get and run the query.
-    apr_dbd_prepared_t* ListUsersQuery = apr_hash_get(
-        dbd->prepared, "ListUsers", APR_HASH_KEY_STRING
+    const char* queryName = "parsegraph_login_listUsers";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
-    if(ListUsersQuery == NULL) {
+    if(query == NULL) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "ListUsers query was not defined."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
         );
         return -1;
     }
@@ -698,7 +669,7 @@ int parsegraph_listUsers(
         pool,
         dbd->handle,
         res,
-        ListUsersQuery,
+        query,
         0
     );
 }
@@ -710,13 +681,14 @@ int parsegraph_hasUser(
     const char* username)
 {
     // Get and run the query.
-    apr_dbd_prepared_t* HasUserQuery = apr_hash_get(
-        dbd->prepared, "HasUser", APR_HASH_KEY_STRING
+    const char* queryName = "parsegraph_login_hasUser";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
-    if(HasUserQuery == NULL) {
+    if(query == NULL) {
          // Query was not defined.
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "HasUser query was not defined."
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
         );
         return -1;
     }
@@ -725,7 +697,7 @@ int parsegraph_hasUser(
         pool,
         dbd->handle,
         res,
-        HasUserQuery,
+        query,
         0,
         username
     );

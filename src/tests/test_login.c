@@ -236,7 +236,7 @@ int main(int argc, const char* const* argv)
         return -1;
     }
 
-    rv = parsegraph_prepareUserStatements(pool, dbd);
+    rv = parsegraph_prepareLoginStatements(pool, dbd);
     if(rv != 0) {
         fprintf(stderr, "Failed preparing SQL statements, status of %d.\n", rv);
         return -1;
