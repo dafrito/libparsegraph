@@ -63,6 +63,53 @@ void test_createNewUser()
     ));
 }
 
+void test_removeUser()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+
+    // Check for an existing user.
+    apr_dbd_results_t* res = NULL;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_getUser(
+        pool, dbd, &res, TEST_USERNAME
+    ));
+    apr_dbd_row_t* row;
+    TEST_ASSERT_EQUAL_INT(0, apr_dbd_get_row(
+        dbd->driver,
+        pool,
+        res,
+        &row,
+        -1
+    ));
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+
+    // Check for an existing user.
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_getUser(
+        pool, dbd, &res, TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(-1, apr_dbd_get_row(
+        dbd->driver,
+        pool,
+        res,
+        &row,
+        -1
+    ));
+}
+
 void test_loginActuallyWorks()
 {
     TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
@@ -249,6 +296,7 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_listUsers);
     RUN_TEST(test_encryptPassword);
     RUN_TEST(test_loginActuallyWorks);
+    RUN_TEST(test_removeUser);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);
