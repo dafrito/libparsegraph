@@ -1,12 +1,19 @@
-lib_LTLIBRARIES = libparsegraph_login.la
+lib_LTLIBRARIES = libparsegraph_login.la libparsegraph_login_httpd.la
 libparsegraph_login_la_CFLAGS = -Wall @httpd_CFLAGS@ @openssl_CFLAGS@
 libparsegraph_login_la_LDFLAGS = @httpd_LIBS@ @openssl_LIBS@ -shared
 
 include_HEADERS = \
-	parsegraph_login.h
+	parsegraph_login.h \
+	parsegraph_login_httpd.h
 
 libparsegraph_login_la_SOURCES = \
 	parsegraph_login.c
+
+libparsegraph_login_httpd_la_CFLAGS = $(libparsegraph_login_la_CFLAGS)
+libparsegraph_login_httpd_la_LDFLAGS = -lparsegraph_login $(libparsegraph_login_la_LDFLAGS)
+
+libparsegraph_login_httpd_la_SOURCES = \
+	parsegraph_login_httpd.c
 
 bin_PROGRAMS = parsegraph_login_install parsegraph_login_config
 
