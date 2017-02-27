@@ -17,10 +17,12 @@ int parsegraph_prepareLoginStatements(
         "parsegraph_login_beginUserLogin", "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)", // 3
         "parsegraph_login_endUserLogin", "DELETE FROM login WHERE username = %s", // 4
         "parsegraph_login_listUsers", "SELECT id, username FROM user", // 5
-        "parsegraph_login_removeUser", "DELETE FROM user WHERE username = %s" // 6
+        "parsegraph_login_removeUser", "DELETE FROM user WHERE username = %s", // 6
+        "parsegraph_login_refreshUserLogin", "SELECT username FROM login WHERE selector = %s AND token = %s" // 7
     };
+    static int NUM_QUERIES = 7;
 
-    for(int i = 0; i < 6 * 2; i += 2) {
+    for(int i = 0; i < NUM_QUERIES * 2; i += 2) {
         const char* label = queries[i];
         const char* query = queries[i + 1];
 
@@ -238,6 +240,35 @@ const int parsegraph_PASSWORD_SALT_LENGTH = 12;
 const int parsegraph_SELECTOR_LENGTH = 32;
 const int parsegraph_TOKEN_LENGTH = 128;
 
+const char* parsegraph_constructSessionString(apr_pool_t* pool, const char* session_selector, const char* session_token)
+{
+    return apr_pstrcat(pool, session_selector, "$", session_token, NULL);
+}
+
+int parsegraph_deconstructSessionString(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token)
+{
+    size_t expectedLen = (apr_base64_encode_len(parsegraph_SELECTOR_LENGTH) - 1) + 1 + (apr_base64_encode_len(parsegraph_TOKEN_LENGTH) - 1);
+    size_t sessLen = strnlen(sessionValue, expectedLen);
+    if(
+        sessLen != expectedLen ||
+        sessionValue[apr_base64_encode_len(parsegraph_SELECTOR_LENGTH) - 1] != '$'
+    ) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Session value is malformed. (%zu expected, %zu given)", expectedLen, sessLen
+        );
+        return HTTP_BAD_REQUEST;
+    }
+
+    *session_selector = apr_pstrmemdup(
+        pool, sessionValue, apr_base64_encode_len(parsegraph_SELECTOR_LENGTH) - 1
+    );
+    *session_token = apr_pstrmemdup(
+        pool, &sessionValue[apr_base64_encode_len(parsegraph_SELECTOR_LENGTH)], apr_base64_encode_len(parsegraph_TOKEN_LENGTH) - 1
+    );
+
+    return 0;
+}
+
 int parsegraph_createNewUser(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
@@ -450,6 +481,85 @@ int parsegraph_generateLogin(apr_pool_t* pool, const char* username, struct pars
         (*createdLogin)->session_selector = selector_encoded;
         (*createdLogin)->session_token = token_encoded;
     }
+
+    return 0;
+}
+
+int parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* dbd, struct parsegraph_user_login* createdLogin)
+{
+    if(!createdLogin) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "No login was provided."
+        );
+        return -1;
+    }
+    if(!createdLogin->session_selector) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "No login session selector was provided."
+        );
+        return -1;
+    }
+    if(!createdLogin->session_token) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "No login session token was provided."
+        );
+        return -1;
+    }
+
+    const char* queryName = "parsegraph_login_refreshUserLogin";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
+    );
+    if(query == NULL) {
+         // Query was not defined.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
+        );
+        return -1;
+    }
+
+    apr_dbd_results_t* res = 0;
+    int rv = apr_dbd_pvselect(
+        dbd->driver,
+        pool,
+        dbd->handle,
+        &res,
+        query,
+        0,
+        createdLogin->session_selector,
+        createdLogin->session_token
+    );
+    if(rv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute.", queryName
+        );
+        return -1;
+    }
+
+    apr_dbd_row_t* row = 0;
+    int dbrv = apr_dbd_get_row(
+        dbd->driver,
+        pool,
+        res,
+        &row,
+        -1
+    );
+    if(dbrv != 0) {
+        return HTTP_UNAUTHORIZED;
+    }
+
+    const char* username = apr_dbd_get_entry(
+        dbd->driver,
+        row,
+        0
+    );
+    if(!username) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "username must not be null."
+        );
+        return 500;
+    }
+    createdLogin->username = username;
 
     return 0;
 }

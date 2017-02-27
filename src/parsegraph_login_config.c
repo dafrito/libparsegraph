@@ -25,7 +25,7 @@ void ap_log_perror(
 int main(int argc, const char* const* argv)
 {
     if(argc < 3) {
-        fprintf(stderr, "usage: parsegraph_login_install {database_type} {connection_string}");
+        fprintf(stderr, "usage: parsegraph_login_config {database_type} {connection_string}");
         return -1;
     }
 

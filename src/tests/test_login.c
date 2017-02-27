@@ -236,6 +236,52 @@ void test_disallowInvalidUsernames()
     ));
 }
 
+void test_deconstruct()
+{
+    struct parsegraph_user_login* createdLogin = 0;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_generateLogin(pool, "dafrito", &createdLogin));
+
+    const char* sessionValue = parsegraph_constructSessionString(
+        pool, createdLogin->session_selector, createdLogin->session_token
+    );
+    const char* session_selector;
+    const char* session_token;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_deconstructSessionString(pool, sessionValue, &session_selector, &session_token));
+
+    TEST_ASSERT_EQUAL_STRING(createdLogin->session_selector, session_selector);
+    TEST_ASSERT_EQUAL_STRING(createdLogin->session_token, session_token);
+}
+
+void test_refreshUserLogin()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+
+    struct parsegraph_user_login* createdLogin;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_beginUserLogin(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD,
+        &createdLogin
+    ));
+
+    createdLogin->username = 0;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_refreshUserLogin(
+        pool, dbd, createdLogin
+    ));
+    TEST_ASSERT_EQUAL_STRING(TEST_USERNAME, createdLogin->username);
+}
+
 int main(int argc, const char* const* argv)
 {
     UNITY_BEGIN();
@@ -297,6 +343,8 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_encryptPassword);
     RUN_TEST(test_loginActuallyWorks);
     RUN_TEST(test_removeUser);
+    RUN_TEST(test_deconstruct);
+    RUN_TEST(test_refreshUserLogin);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);

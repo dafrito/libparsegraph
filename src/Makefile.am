@@ -8,13 +8,19 @@ include_HEADERS = \
 libparsegraph_login_la_SOURCES = \
 	parsegraph_login.c
 
-bin_PROGRAMS = parsegraph_login_install
+bin_PROGRAMS = parsegraph_login_install parsegraph_login_config
 
 parsegraph_login_install_CFLAGS = \
 	$(libparsegraph_login_la_CFLAGS) \
 	-I$(top_SRCDIR)
 parsegraph_login_install_LDFLAGS = $(libparsegraph_login_la_LDFLAGS)
 parsegraph_login_install_LDADD = libparsegraph_login.la
+
+parsegraph_login_config_CFLAGS = \
+	$(libparsegraph_login_la_CFLAGS) \
+	-I$(top_SRCDIR)
+parsegraph_login_config_LDFLAGS = $(libparsegraph_login_la_LDFLAGS)
+parsegraph_login_config_LDADD = libparsegraph_login.la
 
 # Install to Apache
 #install-exec-hook:
