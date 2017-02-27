@@ -6,5 +6,6 @@
 #include <http_protocol.h>
 
 int parsegraph_authenticate(request_rec* r);
+apr_status_t parsegraph_removeSession(request_rec* r);
 
 #endif // parsegraph_login_httpd_INCLUDED

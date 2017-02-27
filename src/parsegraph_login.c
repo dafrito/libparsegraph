@@ -505,6 +505,7 @@ int parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* dbd, struct parsegra
         );
         return -1;
     }
+    createdLogin->username = 0;
 
     const char* queryName = "parsegraph_login_refreshUserLogin";
     apr_dbd_prepared_t* query = apr_hash_get(
@@ -553,10 +554,14 @@ int parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* dbd, struct parsegra
         row,
         0
     );
+    size_t username_size;
     if(!username) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "username must not be null."
         );
+        return 500;
+    }
+    if(0 != parsegraph_validateUsername(pool, username, &username_size)) {
         return 500;
     }
     createdLogin->username = username;
