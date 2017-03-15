@@ -168,6 +168,4 @@ int parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** pass
 int parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_size);
 int parsegraph_generateLogin(apr_pool_t* pool, const char* username, struct parsegraph_user_login** createdLogin);
 
-int parsegraph_authenticate(request_rec* r);
-
 #endif // parsegraph_common_INCLUDED

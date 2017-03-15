@@ -10,15 +10,15 @@ checkvalgrind:
 pkgconfigdir = $(libdir)/pkgconfig
 
 pkgconfig_DATA = \
-	parsegraph_login.pc
+	parsegraph_user.pc
 
-parsegraph_login.pc: parsegraph_login.pc.head
+parsegraph_user.pc: parsegraph_user.pc.head
 	cat $< >$@
-	echo "Libs: -L$(libdir) -lparsegraph_login $(httpd_LIBS)" >>$@
+	echo "Libs: -L$(libdir) -lparsegraph_user $(httpd_LIBS)" >>$@
 	echo "Cflags: -I$(includedir) $(httpd_CFLAGS)" >>$@
-	echo "parsegraph_login_install=$(bindir)/parsegraph_login_install" >>$@
+	echo "parsegraph_user_install=$(bindir)/parsegraph_user_install" >>$@
 
-MOSTLYCLEANFILES = parsegraph_login.pc
+MOSTLYCLEANFILES = parsegraph_user.pc
 
 rpm: rpm.sh
 	bash rpm.sh

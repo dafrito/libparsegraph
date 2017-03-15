@@ -1,4 +1,4 @@
-#include "parsegraph_login.h"
+#include "parsegraph_user.h"
 
 #include <openssl/sha.h>
 #include <apr_strings.h>
@@ -12,13 +12,13 @@ int parsegraph_prepareLoginStatements(
 )
 {
     static const char* queries[] = {
-        "parsegraph_login_getUser", "SELECT id, password, password_salt FROM user WHERE username = %s", // 1
-        "parsegraph_login_createNewUser", "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)", // 2
-        "parsegraph_login_beginUserLogin", "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)", // 3
-        "parsegraph_login_endUserLogin", "DELETE FROM login WHERE username = %s", // 4
-        "parsegraph_login_listUsers", "SELECT id, username FROM user", // 5
-        "parsegraph_login_removeUser", "DELETE FROM user WHERE username = %s", // 6
-        "parsegraph_login_refreshUserLogin", "SELECT username FROM login WHERE selector = %s AND token = %s" // 7
+        "parsegraph_user_getUser", "SELECT id, password, password_salt FROM user WHERE username = %s", // 1
+        "parsegraph_user_createNewUser", "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)", // 2
+        "parsegraph_user_beginUserLogin", "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)", // 3
+        "parsegraph_user_endUserLogin", "DELETE FROM login WHERE username = %s", // 4
+        "parsegraph_user_listUsers", "SELECT id, username FROM user", // 5
+        "parsegraph_user_removeUser", "DELETE FROM user WHERE username = %s", // 6
+        "parsegraph_user_refreshUserLogin", "SELECT username FROM login WHERE selector = %s AND token = %s" // 7
     };
     static int NUM_QUERIES = 7;
 
@@ -331,7 +331,7 @@ int parsegraph_createNewUser(
     parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded));
 
     // Insert the new user into the database.
-    const char* queryName = "parsegraph_login_createNewUser";
+    const char* queryName = "parsegraph_user_createNewUser";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -398,7 +398,7 @@ int parsegraph_removeUser(
     }
 
     // Remove the user.
-    const char* queryName = "parsegraph_login_removeUser";
+    const char* queryName = "parsegraph_user_removeUser";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -507,7 +507,7 @@ int parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* dbd, struct parsegra
     }
     createdLogin->username = 0;
 
-    const char* queryName = "parsegraph_login_refreshUserLogin";
+    const char* queryName = "parsegraph_user_refreshUserLogin";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -580,18 +580,18 @@ int parsegraph_beginUserLogin(
     size_t username_size;
     if(0 != parsegraph_validateUsername(pool, username, &username_size)) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username to begin user login."
         );
-        return 500;
+        return HTTP_UNAUTHORIZED;
     }
 
     // Validate the password.
     size_t password_size;
     if(0 != parsegraph_validatePassword(pool, password, &password_size)) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate password to create new user."
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate password to begin user login."
         );
-        return 500;
+        return HTTP_UNAUTHORIZED;
     }
 
     // Check for an existing user.
@@ -616,7 +616,7 @@ int parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Didn't find any passwords for the given username."
         );
-        return 500;
+        return HTTP_UNAUTHORIZED;
     }
 
     int user_id;
@@ -669,7 +669,7 @@ int parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Given password doesn't match the password in the database."
         );
-        return 500;
+        return HTTP_UNAUTHORIZED;
     }
 
     // Passwords match, so create a login.
@@ -681,7 +681,7 @@ int parsegraph_beginUserLogin(
     }
 
     // Insert the new login into the database.
-    const char* queryName = "parsegraph_login_beginUserLogin";
+    const char* queryName = "parsegraph_user_beginUserLogin";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -742,7 +742,7 @@ int parsegraph_endUserLogin(
     }
 
     // Remove the login into the database.
-    const char* queryName = "parsegraph_login_endUserLogin";
+    const char* queryName = "parsegraph_user_endUserLogin";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -769,7 +769,7 @@ int parsegraph_listUsers(
     apr_dbd_results_t** res)
 {
     // Get and run the query.
-    const char* queryName = "parsegraph_login_listUsers";
+    const char* queryName = "parsegraph_user_listUsers";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
@@ -796,7 +796,7 @@ int parsegraph_getUser(
     const char* username)
 {
     // Get and run the query.
-    const char* queryName = "parsegraph_login_getUser";
+    const char* queryName = "parsegraph_user_getUser";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );

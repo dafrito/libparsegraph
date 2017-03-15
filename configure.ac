@@ -1,11 +1,11 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([parsegraph_login], [1.0], [dafrito@gmail.com], [parsegraph_login], [https://parsegraph.com])
+AC_INIT([parsegraph_user], [1.0], [dafrito@gmail.com], [parsegraph_user], [https://parsegraph.com])
 AC_SUBST([PACKAGE_RELEASE], [1])
 AM_INIT_AUTOMAKE([-Wall foreign serial-tests subdir-objects])
-AC_CONFIG_SRCDIR([src/parsegraph_login.c])
-AC_CONFIG_HEADERS([src/parsegraph_login_config.h])
+AC_CONFIG_SRCDIR([src/parsegraph_user.c])
+AC_CONFIG_HEADERS([src/parsegraph_user_config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Check for build programs
@@ -31,7 +31,7 @@ PKG_CHECK_MODULES(openssl, [openssl],
 )
 
 AC_SUBST([PACKAGE_DESCRIPTION], ['This C library contains functions for logging in Parsegraph users'])
-AC_SUBST([PACKAGE_SUMMARY], ['User login functions for Parsegraph'])
+AC_SUBST([PACKAGE_SUMMARY], ['User functions for Parsegraph'])
 
-AC_CONFIG_FILES([Makefile src/Makefile parsegraph_login.pc.head src/rpm.spec rpm.sh])
+AC_CONFIG_FILES([Makefile src/Makefile parsegraph_user.pc.head src/rpm.spec rpm.sh])
 AC_OUTPUT

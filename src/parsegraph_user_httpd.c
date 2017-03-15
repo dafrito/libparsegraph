@@ -1,13 +1,23 @@
-#include "parsegraph_login_httpd.h"
+#include "parsegraph_user_httpd.h"
 #include "util_cookies.h"
 #include <apr_dbd.h>
 #include <mod_dbd.h>
 #include <http_log.h>
-#include "parsegraph_login.h"
+#include "parsegraph_user.h"
 
 apr_status_t parsegraph_removeSession(request_rec* r)
 {
+    r->user = 0;
     return ap_cookie_remove(r, "session", 0, r->headers_out, NULL);
+}
+
+apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin)
+{
+    r->user = createdLogin->username;
+    return ap_cookie_write(r, "session", parsegraph_constructSessionString(r->pool,
+        createdLogin->session_selector,
+        createdLogin->session_token
+    ), "HttpOnly;Version=1", 0, r->headers_out, NULL);
 }
 
 int parsegraph_authenticate(request_rec* r)
@@ -38,7 +48,9 @@ int parsegraph_authenticate(request_rec* r)
         createdLogin->session_token = session_token;
         switch(parsegraph_refreshUserLogin(r->pool, dbd, createdLogin)) {
         case 0:
+            break;
         case HTTP_UNAUTHORIZED:
+            r->status_line = "Failed to log in using given session.";
             break;
         default:
             // General failure.
@@ -55,7 +67,11 @@ int parsegraph_authenticate(request_rec* r)
 
         // Indicate a serious failure since the session was given, yet no username
         // was available.
-        return 500;
+        r->status_line = "Session does not match any user.";
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, r->pool, "Session was given but does not match any user."
+        );
+        return HTTP_UNAUTHORIZED;
     }
 
     r->user = (char*)createdLogin->username;
