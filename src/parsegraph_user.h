@@ -162,6 +162,8 @@ int parsegraph_getIDForUsername(
     const char* username,
     int* user_id);
 
+int parsegraph_getUserProfile(apr_pool_t *pool, ap_dbd_t* dbd, const char* username, const char** profile);
+int parsegraph_setUserProfile(apr_pool_t *pool, ap_dbd_t* dbd, const char* username, const char* profile);
 int parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size);
 int parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size);
 int parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** password_salt_encoded);

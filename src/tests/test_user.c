@@ -63,6 +63,48 @@ void test_createNewUser()
     ));
 }
 
+void test_profile()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+
+    const char* profile;
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_getUserProfile(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        &profile
+    ));
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_setUserProfile(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        "No time."
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_getUserProfile(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        &profile
+    ));
+    TEST_ASSERT_EQUAL_STRING_MESSAGE("No time.", profile, "Profiles equal");
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+}
+
 void test_removeUser()
 {
     TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
@@ -345,6 +387,7 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_removeUser);
     RUN_TEST(test_deconstruct);
     RUN_TEST(test_refreshUserLogin);
+    RUN_TEST(test_profile);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);

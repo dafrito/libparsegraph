@@ -12,15 +12,16 @@ int parsegraph_prepareLoginStatements(
 )
 {
     static const char* queries[] = {
-        "parsegraph_user_getUser", "SELECT id, password, password_salt FROM user WHERE username = %s", // 1
+        "parsegraph_user_getUser", "SELECT id, password, password_salt, profile FROM user WHERE username = %s", // 1
         "parsegraph_user_createNewUser", "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)", // 2
         "parsegraph_user_beginUserLogin", "INSERT INTO login(username, selector, token) VALUES(%s, %s, %s)", // 3
         "parsegraph_user_endUserLogin", "DELETE FROM login WHERE username = %s", // 4
         "parsegraph_user_listUsers", "SELECT id, username FROM user", // 5
         "parsegraph_user_removeUser", "DELETE FROM user WHERE username = %s", // 6
-        "parsegraph_user_refreshUserLogin", "SELECT username FROM login WHERE selector = %s AND token = %s" // 7
+        "parsegraph_user_refreshUserLogin", "SELECT username FROM login WHERE selector = %s AND token = %s", // 7
+        "parsegraph_user_setUserProfile", "UPDATE user SET profile = %pDt WHERE username = %s" // 8
     };
-    static int NUM_QUERIES = 7;
+    static int NUM_QUERIES = 8;
 
     for(int i = 0; i < NUM_QUERIES * 2; i += 2) {
         const char* label = queries[i];
@@ -66,7 +67,8 @@ int parsegraph_upgradeUserTables(
             "username blob unique, "
             "email blob, "
             "password blob, "
-            "password_salt blob"
+            "password_salt blob, "
+            "profile text"
         ")"
     );
     if(rv != 0) {
@@ -864,5 +866,105 @@ int parsegraph_getIDForUsername(
         return 500;
     }
 
+    return 0;
+}
+
+int parsegraph_getUserProfile(
+    apr_pool_t *pool,
+    ap_dbd_t* dbd,
+    const char* username,
+    const char** profile)
+{
+    apr_dbd_results_t* res = NULL;
+    if(0 != parsegraph_getUser(
+        pool, dbd, &res, username
+    )) {
+        // Failed to query for user.
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to query for user."
+        );
+        return 500;
+    }
+
+    apr_dbd_row_t* row;
+    int dbrv = apr_dbd_get_row(
+        dbd->driver,
+        pool,
+        res,
+        &row,
+        -1
+    );
+    if(dbrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "User row not found."
+        );
+        return 404;
+    }
+
+    *profile = apr_dbd_get_entry(
+        dbd->driver,
+        row,
+        3
+    );
+    if(profile == 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve profile for username."
+        );
+        return 500;
+    }
+
+    return 0;
+}
+
+int parsegraph_setUserProfile(
+    apr_pool_t *pool,
+    ap_dbd_t* dbd,
+    const char* username,
+    const char* profile)
+{
+    // Set the profile
+    const char* queryName = "parsegraph_user_setUserProfile";
+    apr_dbd_prepared_t* query = apr_hash_get(
+        dbd->prepared, queryName, APR_HASH_KEY_STRING
+    );
+    if(query == NULL) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+            queryName
+        );
+        return -1;
+    }
+    int nrows = 0;
+    int rv = apr_dbd_pvquery(
+        dbd->driver,
+        pool,
+        dbd->handle,
+        &nrows,
+        query,
+        profile,
+        username
+    );
+
+    // Confirm result.
+    if(rv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Query failed to execute. [%s]",
+            apr_dbd_error(dbd->driver, dbd->handle, rv)
+        );
+        return -1;
+    }
+    if(nrows == 0) {
+        // Nothing changed.
+        return 0;
+    }
+    if(nrows != 1) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of user profiles edited; expected 1, got %d",
+            nrows
+        );
+        return -1;
+    }
+
+    // Indicate success.
     return 0;
 }
