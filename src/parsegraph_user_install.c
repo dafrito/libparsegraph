@@ -1,4 +1,4 @@
-#include "parsegraph_login.h"
+#include "parsegraph_user.h"
 #include <stdio.h>
 #include <http_log.h>
 
@@ -25,7 +25,7 @@ void ap_log_perror(
 int main(int argc, const char* const* argv)
 {
     if(argc < 3) {
-        fprintf(stderr, "usage: parsegraph_login_install {database_type} {connection_string}");
+        fprintf(stderr, "usage: parsegraph_user_install {database_type} {connection_string}\n");
         return -1;
     }
 

@@ -876,12 +876,11 @@ int parsegraph_getUserProfile(
     const char** profile)
 {
     apr_dbd_results_t* res = NULL;
-    if(0 != parsegraph_getUser(
-        pool, dbd, &res, username
-    )) {
+    int rv = parsegraph_getUser(pool, dbd, &res, username);
+    if(rv != 0) {
         // Failed to query for user.
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to query for user."
+            APLOG_MARK, APLOG_ERR, rv, pool, "Failed to query for user."
         );
         return 500;
     }
@@ -896,7 +895,8 @@ int parsegraph_getUserProfile(
     );
     if(dbrv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "User row not found."
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "User row not found [%s]",
+            apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return 404;
     }
@@ -948,7 +948,7 @@ int parsegraph_setUserProfile(
     // Confirm result.
     if(rv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Query failed to execute. [%s]",
+            APLOG_MARK, APLOG_ERR, rv, pool, "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
         return -1;

@@ -15,19 +15,13 @@ libparsegraph_user_httpd_la_LDFLAGS = -lparsegraph_user $(libparsegraph_user_la_
 libparsegraph_user_httpd_la_SOURCES = \
 	parsegraph_user_httpd.c
 
-bin_PROGRAMS = parsegraph_user_install parsegraph_user_config
+bin_PROGRAMS = parsegraph_user_install
 
 parsegraph_user_install_CFLAGS = \
 	$(libparsegraph_user_la_CFLAGS) \
 	-I$(top_SRCDIR)
 parsegraph_user_install_LDFLAGS = $(libparsegraph_user_la_LDFLAGS)
 parsegraph_user_install_LDADD = libparsegraph_user.la
-
-parsegraph_user_config_CFLAGS = \
-	$(libparsegraph_user_la_CFLAGS) \
-	-I$(top_SRCDIR)
-parsegraph_user_config_LDFLAGS = $(libparsegraph_user_la_LDFLAGS)
-parsegraph_user_config_LDADD = libparsegraph_user.la
 
 # Install to Apache
 #install-exec-hook:
