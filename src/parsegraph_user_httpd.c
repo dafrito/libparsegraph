@@ -8,19 +8,20 @@
 apr_status_t parsegraph_removeSession(request_rec* r)
 {
     r->user = 0;
-    return ap_cookie_remove(r, "session", 0, r->headers_out, NULL);
+    apr_status_t rv = ap_cookie_remove(r, "session", 0, r->headers_out, NULL);
+    return rv;
 }
 
 apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin)
 {
-    r->user = createdLogin->username;
+    r->user = (char*)createdLogin->username;
     return ap_cookie_write(r, "session", parsegraph_constructSessionString(r->pool,
         createdLogin->session_selector,
         createdLogin->session_token
-    ), "HttpOnly;Version=1", 0, r->headers_out, NULL);
+    ), "HttpOnly;Max-Age=315360000;Version=1", 0, r->headers_out, NULL);
 }
 
-int parsegraph_authenticate(request_rec* r)
+parsegraph_UserStatus parsegraph_authenticate(request_rec* r)
 {
     ap_dbd_t* dbd = ap_dbd_acquire(r);
     r->user = 0;
@@ -31,12 +32,11 @@ int parsegraph_authenticate(request_rec* r)
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, r->pool, "ap_cookie_read failed for session."
         );
-        return 500;
+        return parsegraph_ERROR;
     }
-
     // No session value at all.
     if(!sessionValue) {
-        return HTTP_UNAUTHORIZED;
+        return parsegraph_SESSION_DOES_NOT_EXIST;
     }
 
     const char* session_selector;
@@ -46,35 +46,26 @@ int parsegraph_authenticate(request_rec* r)
     if(sessionValue && 0 == parsegraph_deconstructSessionString(r->pool, sessionValue, &session_selector, &session_token)) {
         createdLogin->session_selector = session_selector;
         createdLogin->session_token = session_token;
-        switch(parsegraph_refreshUserLogin(r->pool, dbd, createdLogin)) {
-        case 0:
-            break;
-        case HTTP_UNAUTHORIZED:
-            r->status_line = "Failed to log in using given session.";
-            break;
-        default:
-            // General failure.
-            return 500;
+        parsegraph_UserStatus rv = parsegraph_refreshUserLogin(r->pool, dbd, createdLogin);
+        if(rv != parsegraph_OK) {
+            return rv;
         }
     }
     if(!createdLogin->username) {
         // Clear the session cookie as it did not produce a username.
-        if(0 != parsegraph_removeSession(r)) {
+        if(parsegraph_OK != parsegraph_removeSession(r)) {
             ap_log_perror(
                 APLOG_MARK, APLOG_ERR, 0, r->pool, "Failed to remove session cookie."
             );
+            return parsegraph_ERROR;
         }
 
         // Indicate a serious failure since the session was given, yet no username
         // was available.
         r->status_line = "Session does not match any user.";
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, r->pool, "Session was given but does not match any user."
-        );
-        return HTTP_UNAUTHORIZED;
+        return parsegraph_SESSION_DOES_NOT_MATCH;
     }
 
     r->user = (char*)createdLogin->username;
-
-    return 0;
+    return parsegraph_OK;
 }

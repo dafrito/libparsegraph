@@ -25,6 +25,7 @@ void ap_log_perror(
 
 static const char* TEST_USERNAME = "foodens";
 static const char* TEST_PASSWORD = "barbarbaz";
+static const char* TEST_PASSWORD2 = "zoozoobat";
 
 void test_createNewUser()
 {
@@ -50,7 +51,7 @@ void test_createNewUser()
         TEST_USERNAME,
         TEST_PASSWORD
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USER_ALREADY_EXISTS, parsegraph_createNewUser(
         pool,
         dbd,
         TEST_USERNAME,
@@ -178,19 +179,19 @@ void test_loginActuallyWorks()
 
 void test_disallowInvalidPasswords()
 {
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_PASSWORD_TOO_SHORT, parsegraph_createNewUser(
         pool,
         dbd,
         TEST_USERNAME,
         "abc"
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_PASSWORD_TOO_SHORT, parsegraph_createNewUser(
         pool,
         dbd,
         TEST_USERNAME,
         ""
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_PASSWORD_TOO_LONG, parsegraph_createNewUser(
         pool,
         dbd,
         TEST_USERNAME,
@@ -206,18 +207,18 @@ void test_disallowInvalidPasswords()
         "abcdefghijklmnopqrstuvwxyz"
         "abcdefghijklmnopqrstuvwxyz"
     ));
-    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_createNewUser(
         pool,
         dbd,
         TEST_USERNAME,
         "';select * from user"
     ));
-    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_removeUser(
         pool,
         dbd,
         TEST_USERNAME
     ));
-    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_createNewUser(
         pool,
         dbd,
         TEST_USERNAME,
@@ -240,37 +241,37 @@ void test_encryptPassword()
 
 void test_disallowInvalidUsernames()
 {
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USERNAME_TOO_SHORT, parsegraph_createNewUser(
         pool,
         dbd,
         "z",
         TEST_PASSWORD
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USERNAME_START_NON_LETTER, parsegraph_createNewUser(
         pool,
         dbd,
         "123",
         TEST_PASSWORD
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USERNAME_TOO_SHORT, parsegraph_createNewUser(
         pool,
         dbd,
         "96",
         TEST_PASSWORD
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USERNAME_TOO_SHORT, parsegraph_createNewUser(
         pool,
         dbd,
         "ac",
         TEST_PASSWORD
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USERNAME_START_NON_LETTER, parsegraph_createNewUser(
         pool,
         dbd,
         "9abcdefg",
         TEST_PASSWORD
     ));
-    TEST_ASSERT_EQUAL_INT(500, parsegraph_createNewUser(
+    TEST_ASSERT_EQUAL_INT(parsegraph_USERNAME_START_NON_LETTER, parsegraph_createNewUser(
         pool,
         dbd,
         ";select * from user",
@@ -324,6 +325,135 @@ void test_refreshUserLogin()
     TEST_ASSERT_EQUAL_STRING(TEST_USERNAME, createdLogin->username);
 }
 
+void test_changeUserPassword()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_changeUserPassword(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD2
+    ));
+
+    struct parsegraph_user_login* createdLogin;
+    TEST_ASSERT_EQUAL_INT(parsegraph_INVALID_PASSWORD, parsegraph_beginUserLogin(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD,
+        &createdLogin
+    ));
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_beginUserLogin(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD2,
+        &createdLogin
+    ));
+}
+
+void test_grantSuperadmin()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+    int hasSuperadmin = 0;
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_hasSuperadmin(pool, dbd, TEST_USERNAME, &hasSuperadmin));
+    TEST_ASSERT_EQUAL_INT(0, hasSuperadmin);
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_grantSuperadmin(pool, dbd, TEST_USERNAME));
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_hasSuperadmin(pool, dbd, TEST_USERNAME, &hasSuperadmin));
+    TEST_ASSERT_EQUAL_INT(1, hasSuperadmin);
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_revokeSuperadmin(pool, dbd, TEST_USERNAME));
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_hasSuperadmin(pool, dbd, TEST_USERNAME, &hasSuperadmin));
+    TEST_ASSERT_EQUAL_INT(0, hasSuperadmin);
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+}
+
+void test_banUser()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+    int isBanned = 0;
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_isBanned(pool, dbd, TEST_USERNAME, &isBanned));
+    TEST_ASSERT_EQUAL_INT(0, isBanned);
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_banUser(pool, dbd, TEST_USERNAME));
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_isBanned(pool, dbd, TEST_USERNAME, &isBanned));
+    TEST_ASSERT_EQUAL_INT(1, isBanned);
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_unbanUser(pool, dbd, TEST_USERNAME));
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_isBanned(pool, dbd, TEST_USERNAME, &isBanned));
+    TEST_ASSERT_EQUAL_INT(0, isBanned);
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+}
+
+void test_allowSubscription()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+    int allowsSubscription = 0;
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_allowsSubscription(pool, dbd, TEST_USERNAME, &allowsSubscription));
+    TEST_ASSERT_EQUAL_INT(0, allowsSubscription);
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_allowSubscription(pool, dbd, TEST_USERNAME));
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_allowsSubscription(pool, dbd, TEST_USERNAME, &allowsSubscription));
+    TEST_ASSERT_EQUAL_INT(1, allowsSubscription);
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_disallowSubscription(pool, dbd, TEST_USERNAME));
+    TEST_ASSERT_EQUAL_INT(parsegraph_OK, parsegraph_allowsSubscription(pool, dbd, TEST_USERNAME, &allowsSubscription));
+    TEST_ASSERT_EQUAL_INT(0, allowsSubscription);
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+}
+
 int main(int argc, const char* const* argv)
 {
     UNITY_BEGIN();
@@ -347,7 +477,7 @@ int main(int argc, const char* const* argv)
         fprintf(stderr, "Failed initializing DBD, APR status of %d.\n", rv);
         return -1;
     }
-    dbd = (ap_dbd_t*)apr_palloc(pool, sizeof(ap_dbd_t));
+    dbd = apr_palloc(pool, sizeof(*dbd));
     if(dbd == NULL) {
         fprintf(stderr, "Failed initializing DBD memory");
         return -1;
@@ -388,6 +518,12 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_deconstruct);
     RUN_TEST(test_refreshUserLogin);
     RUN_TEST(test_profile);
+    RUN_TEST(test_changeUserPassword);
+
+    // Release 1!
+    RUN_TEST(test_grantSuperadmin);
+    RUN_TEST(test_banUser);
+    RUN_TEST(test_allowSubscription);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);

@@ -2,7 +2,8 @@
 
 AC_PREREQ([2.68])
 AC_INIT([parsegraph_user], [1.0], [dafrito@gmail.com], [parsegraph_user], [https://parsegraph.com])
-AC_SUBST([PACKAGE_RELEASE], [1])
+AC_SUBST([PACKAGE_RELEASE], [4])
+AC_DEFINE([PACKAGE_RELEASE], [4], [The package release for this project.])
 AM_INIT_AUTOMAKE([-Wall foreign serial-tests subdir-objects])
 AC_CONFIG_SRCDIR([src/parsegraph_user.c])
 AC_CONFIG_HEADERS([src/parsegraph_user_config.h])

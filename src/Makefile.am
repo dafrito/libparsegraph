@@ -1,5 +1,5 @@
 lib_LTLIBRARIES = libparsegraph_user.la libparsegraph_user_httpd.la
-libparsegraph_user_la_CFLAGS = -Wall @httpd_CFLAGS@ @openssl_CFLAGS@
+libparsegraph_user_la_CFLAGS = -Dparsegraph_FULL_VERSION=\"@PACKAGE_VERSION@-@PACKAGE_RELEASE@\" -Wall @httpd_CFLAGS@ @openssl_CFLAGS@
 libparsegraph_user_la_LDFLAGS = @httpd_LIBS@ @openssl_LIBS@ -shared
 
 include_HEADERS = \

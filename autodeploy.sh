@@ -1,10 +1,6 @@
 #!/bin/bash
 
-deploy() {
-    make && make check && make install
-}
-
-deploy
+./deploy.sh
 while inotifywait -e modify -r src; do
-    deploy
+    ./deploy.sh
 done
