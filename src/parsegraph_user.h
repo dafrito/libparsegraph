@@ -120,6 +120,7 @@ struct parsegraph_user_login {
     const char* username;
     const char* session_selector;
     const char* session_token;
+    int userId;
 };
 
 /**
@@ -177,7 +178,7 @@ parsegraph_UserStatus parsegraph_getUser(
     const char* username
 );
 
-parsegraph_UserStatus parsegraph_getIDForUsername(
+parsegraph_UserStatus parsegraph_getIdForUsername(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     const char* username,

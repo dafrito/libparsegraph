@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>parsegraph_user_httpd</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main class="content">
+<h2>parsegraph_user_httpd</h2>
+User functions for use with Apache httpd modules.
+<h3>parsegraph_authenticate(request_rec* r, struct parsegraph_user_login* createdLogin)</h3>
+Authenticates the cookie provided in the given request, storing the result of authentication
+in <code>createdLogin</code>.
+<ul>
+<li>Returns parsegraph_OK if the user was authenticated.
+<li>Returns parsegraph_ERROR if a serious error occurs during authentication.
+<li>Returns parsegraph_SESSION_DOES_NOT_EXIST if the session was not given.
+<li>Returns parsegraph_SESSION_DOES_NOT_MATCH if the session is invalid.
+</ul>
+<h3>apr_status_t parsegraph_removeSession(request_rec* r);</h3>
+Removes the session cookie from the given request.
+<p>
+HttpOnly;Max-Age=315360000;
+<h3>apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin);</h3>
+Sets the session cookie for the given request to the given login.
+</main>
+<nav class="toc">
+<h2>parsegraph_user_httpd</h2>
+<ol>
+<li>parsegraph_authenticate(request_rec* r, struct parsegraph_user_login* createdLogin)
+<li>apr_status_t parsegraph_removeSession(request_rec* r);
+<li>apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin);
+</nav>
+</body>
+</html>

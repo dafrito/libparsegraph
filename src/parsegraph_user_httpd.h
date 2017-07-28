@@ -7,7 +7,7 @@
 
 struct parsegraph_user_login;
 enum parsegraph_UserStatus;
-enum parsegraph_UserStatus parsegraph_authenticate(request_rec* r);
+enum parsegraph_UserStatus parsegraph_authenticate(request_rec* r, struct parsegraph_user_login** authLogin);
 apr_status_t parsegraph_removeSession(request_rec* r);
 apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin);
 

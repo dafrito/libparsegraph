@@ -294,6 +294,45 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
 
         version = 1;
     }
+    if(version == 1) {
+        const char* upgrade[] = {
+            "alter table login add online_environment_id integer"
+        };
+        for(int i = 0; i < sizeof(upgrade)/sizeof(*upgrade); ++i) {
+            rv = apr_dbd_query(dbd->driver, dbd->handle, &nrows, upgrade[i]);
+            if(rv != 0) {
+                ap_log_perror(
+                    APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user upgrade to version 2 command %d failed to execute: %s",
+                    i,
+                    apr_dbd_error(dbd->driver, dbd->handle, rv)
+                );
+                return -1;
+            }
+        }
+
+        int nrowsUpdated = 0;
+        rv = apr_dbd_query(
+            dbd->driver,
+            dbd->handle,
+            &nrowsUpdated,
+            "update parsegraph_user_version set version = 2"
+        );
+        if(rv != 0) {
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
+                apr_dbd_error(dbd->driver, dbd->handle, rv)
+            );
+            return parsegraph_ERROR;
+        }
+        if(nrowsUpdated != 1) {
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of parsegraph_user_version rows updated: %s",
+                apr_dbd_error(dbd->driver, dbd->handle, rv)
+            );
+        }
+
+        version = 2;
+    }
 
     return parsegraph_OK;
 }
@@ -938,6 +977,13 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
     if(parsegraph_OK != rv) {
         return rv;
     }
+    int userId;
+    parsegraph_UserStatus idRV = parsegraph_getIdForUsername(pool, dbd, username, &userId);
+    if(parsegraph_isSeriousUserError(idRV)) {
+        ap_log_perror(APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve ID for generated login.");
+        return idRV;
+    }
+    (*createdLogin)->userId = userId;
 
     // Insert the new login into the database.
     const char* queryName = "parsegraph_user_beginUserLogin";
@@ -1103,7 +1149,7 @@ parsegraph_UserStatus parsegraph_getUser(
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_getIDForUsername(
+parsegraph_UserStatus parsegraph_getIdForUsername(
     apr_pool_t *pool,
     ap_dbd_t* dbd,
     const char* username,

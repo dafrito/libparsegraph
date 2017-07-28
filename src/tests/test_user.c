@@ -454,6 +454,31 @@ void test_allowSubscription()
     ));
 }
 
+void test_getIdForUsername()
+{
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_createNewUser(
+        pool,
+        dbd,
+        TEST_USERNAME,
+        TEST_PASSWORD
+    ));
+
+    int userId;
+    parsegraph_getIdForUsername(pool, dbd, TEST_USERNAME, &userId);
+    TEST_ASSERT(userId != -1);
+
+    TEST_ASSERT_EQUAL_INT(0, parsegraph_removeUser(
+        pool,
+        dbd,
+        TEST_USERNAME
+    ));
+}
+
 int main(int argc, const char* const* argv)
 {
     UNITY_BEGIN();
@@ -524,6 +549,8 @@ int main(int argc, const char* const* argv)
     RUN_TEST(test_grantSuperadmin);
     RUN_TEST(test_banUser);
     RUN_TEST(test_allowSubscription);
+
+    RUN_TEST(test_getIdForUsername);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>user SQLite table</title>
+<link rel="stylesheet" href="style.css"/>
+</head>
+<body>
+<h1>user SQLite table</h1>
+The user.
+<h2>Fields</h2>
+<table>
+<tr><th>Name<th>Type<th>Value</tr>
+<tr><td>id<td>integer<td><p>Internal identifier for the user.<p>Primary key.</tr>
+<tr><td>is_super_admin<td>integer<td><p>Flag that sets whether the user is treated as an administrator in all server environments.</tr>
+<tr><td>is_banned<td>integer<td><p>Flag that sets whether the user is banned from all server environments.</tr>
+<tr><td>create_date<td>text<td><p>Date that the user was created.</tr>
+<tr><td>allow_subscription<td>integer<td><p>Flag that indicates whether the user allows for subscription.</tr>
+<tr><td>username<td>blob<td><p>Name of the user.<p>Unique.</tr>
+<tr><td>email<td>blob<td><p>Email for the user.</tr>
+<tr><td>password<td>blob<td><p>Password storage.</tr>
+<tr><td>password_salt<td>blob<td><p>Password salt storage.</tr>
+<tr><td>profile<td>text<td><p>Profile, in HTML text, to describe the user.</tr>
+</table>
+
+<h1>login SQLite table</h1>
+User logins.
+<h2>Fields</h2>
+<table>
+<tr><th>Name<th>Type<th>Value</tr>
+<tr><td>id<td>integer<td><p>Internal identifier for this login entry.<p>Primary key.</tr>
+<tr><td>username<td>blob<td><p>Reference to this login's authenticated user.</tr>
+<tr><td>selector<td>blob<td><p>Identifying selector for this login entry.</tr>
+<tr><td>token<td>blob<td><p>Identifying token for this login entry.</tr>
+<tr><td>online_environment_id<td>integer<td><p>Reference to the environment that contains this login. i.e the active environment.</tr>
+</table>
+
+<h1>list_item SQLite table</h1>
+List items.
+<h2>Fields</h2>
+<table>
+<tr><th>Name<th>Type<th>Value</tr>
+<tr><td>id<td>integer<td><p>Internal identifier for this list item.<p>Primary key.</tr>
+<tr><td>type<td>integer<td><p>Identifying type for this list item.</tr>
+<tr><td>value<td>blob<td><p>The value for this list item.<p>Not null.</tr>
+<tr><td>list_id<td>integer<td><p>Reference to this list item's parent.</tr>
+<tr><td>next<td>integer<td><p>Reference to this list item's next sibling node.</tr>
+<tr><td>prev<td>integer<td><p>Reference to this list item's previous sibling node.</tr>
+</table>
+
+<h1>user_subscription SQLite table</h1>
+User subscribe to other users.
+<h2>Fields</h2>
+<table>
+<tr><th>Name<th>Type<th>Value</tr>
+<tr><td>subscriber_id<td>integer<td><p>Reference to the subscribing user.</tr>
+<tr><td>subscription_id<td>integer<td><p>Reference to the user that is the target of subscription.</tr>
+<tr><td>subscription_date<td>text<td><p>Date that the subscription was created.</tr>
+</table>
+
+<h1>user_friend SQLite table</h1>
+Users have friends.
+<h2>Fields</h2>
+<table>
+<tr><th>Name<th>Type<th>Value</tr>
+<tr><td>user_id<td>integer<td><p>Reference to the user that has friends.</tr>
+<tr><td>friend_id<td>integer<td><p>Reference to the user that is the friend.</tr>
+<tr><td>create_date<td>text<td><p>Date that the friendship was created.</tr>
+<tr><td>accept_date<td>text<td><p>Date that the friendship was accepted.</tr>
+</table>
+
+<h1>user_ignore SQLite table</h1>
+Users can ignore other users.
+<h2>Fields</h2>
+<table>
+<tr><th>Name<th>Type<th>Value</tr>
+<tr><td>user_id<td>integer<td><p>Reference to the user that has friends.</tr>
+<tr><td>ignored_id<td>integer<td><p>Reference to the ignored user.</tr>
+<tr><td>ignore_date<td>integer<td><p>Create date for this ignore.</tr>
+</table>
+
+</body>
+</html>

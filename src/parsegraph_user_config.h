@@ -44,7 +44,7 @@
 #define PACKAGE_NAME "parsegraph_user"
 
 /* The package release for this project. */
-#define PACKAGE_RELEASE 4
+#define PACKAGE_RELEASE 5
 
 /* Define to the full name and version of this package. */
 #define PACKAGE_STRING "parsegraph_user 1.0"

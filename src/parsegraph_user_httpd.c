@@ -21,7 +21,7 @@ apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login*
     ), "HttpOnly;Max-Age=315360000;Version=1", 0, r->headers_out, NULL);
 }
 
-parsegraph_UserStatus parsegraph_authenticate(request_rec* r)
+parsegraph_UserStatus parsegraph_authenticate(request_rec* r, struct parsegraph_user_login** authLogin)
 {
     ap_dbd_t* dbd = ap_dbd_acquire(r);
     r->user = 0;
@@ -43,6 +43,7 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r)
     const char* session_token;
     struct parsegraph_user_login* createdLogin = apr_palloc(r->pool, sizeof(*createdLogin));
     createdLogin->username = 0;
+    createdLogin->userId = -1;
     if(sessionValue && 0 == parsegraph_deconstructSessionString(r->pool, sessionValue, &session_selector, &session_token)) {
         createdLogin->session_selector = session_selector;
         createdLogin->session_token = session_token;
@@ -50,6 +51,13 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r)
         if(rv != parsegraph_OK) {
             return rv;
         }
+
+        parsegraph_UserStatus idRV = parsegraph_getIdForUsername(r->pool, dbd, r->user, &(createdLogin->userId));
+        if(parsegraph_isSeriousUserError(idRV)) {
+            ap_log_perror(APLOG_MARK, APLOG_ERR, 0, r->pool, "Failed to retrieve ID for authenticated login.");
+            return idRV;
+        }
+        //ap_log_perror(APLOG_MARK, APLOG_INFO, 0, r->pool, "Retrieved userId: %d", createdLogin->userId);
     }
     if(!createdLogin->username) {
         // Clear the session cookie as it did not produce a username.
@@ -67,5 +75,6 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r)
     }
 
     r->user = (char*)createdLogin->username;
+    *authLogin = createdLogin;
     return parsegraph_OK;
 }
