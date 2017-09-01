@@ -2,5 +2,5 @@ prefix=/home/dafrito
 exec_prefix=${prefix}
 
 Name: parsegraph_user
-Version: 1.0
+Version: 1.1
 Description: This C library contains functions for logging in Parsegraph users

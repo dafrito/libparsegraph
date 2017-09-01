@@ -20,6 +20,8 @@ The user.
 <tr><td>password<td>blob<td><p>Password storage.</tr>
 <tr><td>password_salt<td>blob<td><p>Password salt storage.</tr>
 <tr><td>profile<td>text<td><p>Profile, in HTML text, to describe the user.</tr>
+<tr><td>storage_list_id<td>integer<td><p>List that contains the user's current inventory.</tr>
+<tr><td>disposed_list_id<td>integer<td><p>List that contains the user's disposed items.</tr>
 </table>
 
 <h1>login SQLite table</h1>
@@ -32,6 +34,9 @@ User logins.
 <tr><td>selector<td>blob<td><p>Identifying selector for this login entry.</tr>
 <tr><td>token<td>blob<td><p>Identifying token for this login entry.</tr>
 <tr><td>online_environment_id<td>integer<td><p>Reference to the environment that contains this login. i.e the active environment.</tr>
+<tr><td>chat_opened<td>integer<td>Whether chat is enabled for this session.</tr>
+<tr><td>world_chat_opened<td>integer<td>Whether world chat is enabled for this session.</tr>
+<tr><td>camera_opened<td>integer<td>Whether camera is enabled for this session.</tr>
 </table>
 
 <h1>list_item SQLite table</h1>

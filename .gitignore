@@ -7,6 +7,9 @@ lib*.so.*
 *.lo
 *.la
 
+# Build artifacts
+src/parsegraph_user_install
+
 # Autotools artifacts
 stamp*
 configure

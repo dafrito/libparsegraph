@@ -26,8 +26,8 @@ const char* parsegraph_nameUserStatus(parsegraph_UserStatus rv)
     case parsegraph_SESSION_MALFORMED: return "Session was malformed.";
     case parsegraph_INVALID_PASSWORD: return "Invalid password.";
     case parsegraph_UNDEFINED_PREPARED_STATEMENT: return "A needed prepared statement was undefined.";
-    default: return "Unknown status.";
     }
+    return "Unknown status.";
 }
 
 int parsegraph_isSeriousUserError(parsegraph_UserStatus rv)
@@ -108,12 +108,9 @@ parsegraph_UserStatus parsegraph_prepareLoginStatements(
         "parsegraph_user_disallowSubscription", "UPDATE user SET allow_subscription = 0 WHERE username = %s", // 15
         "parsegraph_user_allowsSubscription", "SELECT allow_subscription FROM user WHERE username = %s", // 16
         "parsegraph_user_isBanned", "SELECT is_banned FROM user WHERE username = %s", // 17
-        "parsegraph_user_hasSuperadmin", "SELECT is_super_admin FROM user WHERE username = %s", // 18
-        "parsegraph_user_beginTransaction", "BEGIN TRANSACTION", // 19
-        "parsegraph_user_commitTransaction", "COMMIT TRANSACTION", // 20
-        "parsegraph_user_rollbackTransaction", "ROLLBACK TRANSACTION" // 21
+        "parsegraph_user_hasSuperadmin", "SELECT is_super_admin FROM user WHERE username = %s" // 18
     };
-    static int NUM_QUERIES = 21;
+    static int NUM_QUERIES = 18;
 
     for(int i = 0; i < NUM_QUERIES * 2; i += 2) {
         const char* label = queries[i];
@@ -149,8 +146,9 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
 {
     int nrows;
     int rv;
+    const char* transactionName = "parsegraph_upgradeUserTables";
 
-    rv = parsegraph_beginTransaction(pool, dbd);
+    rv = parsegraph_beginTransaction(pool, dbd, transactionName);
     if(rv != 0) {
         return rv;
     }
@@ -173,7 +171,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             APLOG_MARK, APLOG_ERR, 0, pool, "User table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -193,7 +191,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             APLOG_MARK, APLOG_ERR, 0, pool, "Login table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -210,7 +208,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -228,7 +226,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             APLOG_MARK, APLOG_ERR, 0, pool, "Login table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
     apr_dbd_row_t* versionRow = NULL;
@@ -244,7 +242,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             ap_log_perror(
                 APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version retrieval failed."
             );
-            parsegraph_rollbackTransaction(pool, dbd);
+            parsegraph_rollbackTransaction(pool, dbd, transactionName);
             return parsegraph_ERROR;
         }
     }
@@ -261,7 +259,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
                 APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version table creation query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd);
+            parsegraph_rollbackTransaction(pool, dbd, transactionName);
             return parsegraph_ERROR;
         }
     }
@@ -281,7 +279,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
                     i,
                     apr_dbd_error(dbd->driver, dbd->handle, rv)
                 );
-                parsegraph_rollbackTransaction(pool, dbd);
+                parsegraph_rollbackTransaction(pool, dbd, transactionName);
                 return -1;
             }
         }
@@ -298,7 +296,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
                 APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd);
+            parsegraph_rollbackTransaction(pool, dbd, transactionName);
             return parsegraph_ERROR;
         }
         if(nrowsUpdated != 1) {
@@ -306,6 +304,8 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
                 APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of parsegraph_user_version rows updated: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
+            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            return parsegraph_ERROR;
         }
 
         version = 1;
@@ -322,7 +322,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
                     i,
                     apr_dbd_error(dbd->driver, dbd->handle, rv)
                 );
-                parsegraph_rollbackTransaction(pool, dbd);
+                parsegraph_rollbackTransaction(pool, dbd, transactionName);
                 return -1;
             }
         }
@@ -339,7 +339,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
                 APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd);
+            parsegraph_rollbackTransaction(pool, dbd, transactionName);
             return parsegraph_ERROR;
         }
         if(nrowsUpdated != 1) {
@@ -352,8 +352,9 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         version = 2;
     }
 
-    rv = parsegraph_commitTransaction(pool, dbd);
+    rv = parsegraph_commitTransaction(pool, dbd, transactionName);
     if(rv != parsegraph_OK) {
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return rv;
     }
     return parsegraph_OK;
@@ -902,6 +903,8 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
     const char* password,
     struct parsegraph_user_login** createdLogin)
 {
+    const char* transactionName = "parsegraph_beginUserLogin";
+
     // Validate the username.
     size_t username_size;
     parsegraph_UserStatus rv = parsegraph_validateUsername(pool, username, &username_size);
@@ -916,7 +919,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         return rv;
     }
 
-    rv = parsegraph_beginTransaction(pool, dbd);
+    rv = parsegraph_beginTransaction(pool, dbd, transactionName);
     if(rv != parsegraph_OK) {
         return rv;
     }
@@ -927,7 +930,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         pool, dbd, &res, username
     );
     if(parsegraph_OK != rv) {
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return rv;
     }
     apr_dbd_row_t* row;
@@ -939,7 +942,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         -1
     );
     if(dbrv != 0) {
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_USER_DOES_NOT_EXIST;
     }
 
@@ -957,13 +960,13 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "user_id must not be null for %s", username
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     case APR_EGENERAL:
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve user_id for %s", username
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -976,7 +979,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "password_salt_encoded must not be null."
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -985,7 +988,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate encrypted password."
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -998,26 +1001,26 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Expected_hash must not be null."
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
     if(0 != strcmp(expected_hash_encoded, (const char*)password_hash_encoded)) {
         // Given password doesn't match the password in the database.
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_INVALID_PASSWORD;
     }
 
     // Passwords match, so create a login.
     rv = parsegraph_generateLogin(pool, username, createdLogin);
     if(parsegraph_OK != rv) {
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return rv;
     }
     int userId;
     parsegraph_UserStatus idRV = parsegraph_getIdForUsername(pool, dbd, username, &userId);
     if(parsegraph_isSeriousUserError(idRV)) {
         ap_log_perror(APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve ID for generated login.");
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return idRV;
     }
     (*createdLogin)->userId = userId;
@@ -1032,7 +1035,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
 
@@ -1052,24 +1055,28 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
             APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute: [%s]", queryName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
     if(nrows == 0) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Login for %s was not inserted despite query.", username
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
     if(nrows != 1) {
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions for %s. Got %d insertion(s)", username, nrows
         );
-        parsegraph_rollbackTransaction(pool, dbd);
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
-    parsegraph_commitTransaction(pool, dbd);
+    rv = parsegraph_commitTransaction(pool, dbd, transactionName);
+    if(rv != parsegraph_OK) {
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        return rv;
+    }
     return parsegraph_OK;
 }
 
@@ -1733,7 +1740,6 @@ parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* 
 
 parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
 {
-    // Set the profile
     const char* queryName = "parsegraph_user_disallowSubscription";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
@@ -1779,71 +1785,104 @@ parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* dbd)
+parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName)
 {
+    //ap_log_perror(
+        //APLOG_MARK, APLOG_ERR, 0, pool, "Beginning transaction %s", transactionName
+    //);
     int nrows = 0;
+    char buf[1024];
+    if(0 > snprintf(buf, sizeof(buf), "SAVEPOINT '%s'", transactionName)) {
+        return parsegraph_ERROR;
+    }
     int dbrv = apr_dbd_query(
         dbd->driver,
         dbd->handle,
         &nrows,
-        "BEGIN"
-    );
-
-    // Confirm result.
+        buf);
     if(dbrv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to create savepoint for transaction. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
-
-    // Indicate success.
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* dbd)
+parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName)
 {
+    //ap_log_perror(
+        //APLOG_MARK, APLOG_ERR, 0, pool, "Committing transaction %s", transactionName
+    //);
     int nrows = 0;
+    char buf[1024];
+    if(0 > snprintf(buf, sizeof(buf), "RELEASE '%s'", transactionName)) {
+        return parsegraph_ERROR;
+    }
     int dbrv = apr_dbd_query(
         dbd->driver,
         dbd->handle,
         &nrows,
-        "COMMIT"
-    );
-
-    // Confirm result.
+        buf);
     if(dbrv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to commit savepoint for transaction %s. [%s]",
+            transactionName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
-
-    // Indicate success.
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t* dbd)
+parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName)
 {
+    //ap_log_perror(
+        //APLOG_MARK, APLOG_ERR, 0, pool, "Rolling back transaction %s", transactionName
+    //);
     int nrows = 0;
+    char buf[1024];
+    if(0 > snprintf(buf, sizeof(buf), "ROLLBACK TO '%s'", transactionName)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to roll back transaction %s!", transactionName
+        );
+        return parsegraph_ERROR;
+    }
     int dbrv = apr_dbd_query(
         dbd->driver,
         dbd->handle,
         &nrows,
-        "ROLLBACK"
-    );
-
-    // Confirm result.
+        buf);
     if(dbrv != 0) {
         ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to rollback savepoint for transaction %s. [%s]",
+            transactionName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
 
-    // Indicate success.
+    if(0 > snprintf(buf, sizeof(buf), "RELEASE '%s'", transactionName)) {
+        return -1;
+    }
+    dbrv = apr_dbd_query(
+        dbd->driver,
+        dbd->handle,
+        &nrows,
+        buf);
+    if(dbrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to release savepoint for rolled back transaction %s. [%s]",
+            transactionName,
+            apr_dbd_error(dbd->driver, dbd->handle, dbrv)
+        );
+        return -1;
+    }
+
+    //ap_log_perror(
+        //APLOG_MARK, APLOG_ERR, 0, pool, "Rolled back transaction %s.", transactionName
+    //);
+
     return parsegraph_OK;
 }

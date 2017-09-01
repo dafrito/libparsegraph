@@ -25,6 +25,12 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r, struct parsegraph_
 {
     ap_dbd_t* dbd = ap_dbd_acquire(r);
     r->user = 0;
+    const char* transactionName = "parsegraph_authenticate";
+
+    int rv = parsegraph_beginTransaction(r->pool, dbd, transactionName);
+    if(rv != parsegraph_OK) {
+        return rv;
+    }
 
     // Retrieve and validate the session token and selector.
     const char* sessionValue = 0;
@@ -32,10 +38,12 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r, struct parsegraph_
         ap_log_perror(
             APLOG_MARK, APLOG_ERR, 0, r->pool, "ap_cookie_read failed for session."
         );
+        parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
         return parsegraph_ERROR;
     }
     // No session value at all.
     if(!sessionValue) {
+        parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
         return parsegraph_SESSION_DOES_NOT_EXIST;
     }
 
@@ -49,12 +57,14 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r, struct parsegraph_
         createdLogin->session_token = session_token;
         parsegraph_UserStatus rv = parsegraph_refreshUserLogin(r->pool, dbd, createdLogin);
         if(rv != parsegraph_OK) {
+            parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
             return rv;
         }
 
         parsegraph_UserStatus idRV = parsegraph_getIdForUsername(r->pool, dbd, r->user, &(createdLogin->userId));
         if(parsegraph_isSeriousUserError(idRV)) {
             ap_log_perror(APLOG_MARK, APLOG_ERR, 0, r->pool, "Failed to retrieve ID for authenticated login.");
+            parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
             return idRV;
         }
         //ap_log_perror(APLOG_MARK, APLOG_INFO, 0, r->pool, "Retrieved userId: %d", createdLogin->userId);
@@ -65,16 +75,23 @@ parsegraph_UserStatus parsegraph_authenticate(request_rec* r, struct parsegraph_
             ap_log_perror(
                 APLOG_MARK, APLOG_ERR, 0, r->pool, "Failed to remove session cookie."
             );
+            parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
             return parsegraph_ERROR;
         }
 
         // Indicate a serious failure since the session was given, yet no username
         // was available.
         r->status_line = "Session does not match any user.";
+        parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
         return parsegraph_SESSION_DOES_NOT_MATCH;
     }
 
     r->user = (char*)createdLogin->username;
     *authLogin = createdLogin;
+    rv = parsegraph_commitTransaction(r->pool, dbd, transactionName);
+    if(rv != parsegraph_OK) {
+        parsegraph_rollbackTransaction(r->pool, dbd, transactionName);
+        return rv;
+    }
     return parsegraph_OK;
 }

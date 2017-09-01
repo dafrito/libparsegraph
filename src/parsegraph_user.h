@@ -211,8 +211,8 @@ parsegraph_UserStatus parsegraph_allowSubscription(apr_pool_t* pool, ap_dbd_t* d
 parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* allowsSubscription);
 parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
 
-parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* dbd);
-parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* dbd);
-parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t* dbd);
+parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName);
+parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName);
+parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName);
 
 #endif // parsegraph_user_INCLUDED

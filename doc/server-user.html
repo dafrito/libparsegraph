@@ -66,6 +66,8 @@ Prepares SQL statements for use by this module.<p>Call this function once per DB
 Creates or upgrades the User SQL tables in the given DBD instance.
 <p>
 Call this function once per DBD before use, unless it is known that the SQL tables do not need to be created or upgraded.
+<p>
+Transactional.
 <h2>parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)</h2>
 Returns parsegraph_OK if the given username is valid for insertion. The length of the given username in bytes is stored in username_size.
 <ul>
@@ -161,6 +163,8 @@ The username is also refreshed in the login.
 </ul>
 <h2>parsegraph_beginUserLogin(pool, dbd, const char* username, const char* password, struct parsegraph_user_login** createdLogin)</h2>
 Begins a new login for the named user, confirming the password along the way.
+<p>
+Transactional.
 <ul>
 <li>Returns parsegraph_OK if a login was created.
 <li>Returns parsegraph_INVALID_PASSWORD if the given password does not match the specified user's password.
