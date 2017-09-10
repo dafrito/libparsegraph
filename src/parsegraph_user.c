@@ -145,7 +145,20 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
 )
 {
     int nrows;
-    int rv;
+    int rv = apr_dbd_query(
+        dbd->driver,
+        dbd->handle,
+        &nrows,
+        "create table if not exists transaction_log(name text, level int)"
+    );
+    if(rv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Transaction_log creation query failed to execute: %s",
+            apr_dbd_error(dbd->driver, dbd->handle, rv)
+        );
+        return parsegraph_ERROR;
+    }
+
     const char* transactionName = "parsegraph_upgradeUserTables";
 
     rv = parsegraph_beginTransaction(pool, dbd, transactionName);
@@ -350,6 +363,58 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         }
 
         version = 2;
+    }
+
+    rv = parsegraph_commitTransaction(pool, dbd, transactionName);
+    if(rv != parsegraph_OK) {
+        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        return rv;
+    }
+
+    rv = parsegraph_beginTransaction(pool, dbd, transactionName);
+    if(rv != 0) {
+        return rv;
+    }
+
+    if(version == 2) {
+        const char* upgrade[] = {
+        };
+        for(int i = 0; i < sizeof(upgrade)/sizeof(*upgrade); ++i) {
+            rv = apr_dbd_query(dbd->driver, dbd->handle, &nrows, upgrade[i]);
+            if(rv != 0) {
+                ap_log_perror(
+                    APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user upgrade to version 3 command %d failed to execute: %s",
+                    i,
+                    apr_dbd_error(dbd->driver, dbd->handle, rv)
+                );
+                parsegraph_rollbackTransaction(pool, dbd, transactionName);
+                return -1;
+            }
+        }
+
+        int nrowsUpdated = 0;
+        rv = apr_dbd_query(
+            dbd->driver,
+            dbd->handle,
+            &nrowsUpdated,
+            "update parsegraph_user_version set version = 3"
+        );
+        if(rv != 0) {
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
+                apr_dbd_error(dbd->driver, dbd->handle, rv)
+            );
+            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            return parsegraph_ERROR;
+        }
+        if(nrowsUpdated != 1) {
+            ap_log_perror(
+                APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of parsegraph_user_version rows updated: %s",
+                apr_dbd_error(dbd->driver, dbd->handle, rv)
+            );
+        }
+
+        version = 3;
     }
 
     rv = parsegraph_commitTransaction(pool, dbd, transactionName);
@@ -1807,6 +1872,20 @@ parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* db
         );
         return parsegraph_ERROR;
     }
+
+    if(0 > snprintf(buf, sizeof(buf), "WITH r(value) as (select '%s') INSERT INTO transaction_log(name, level) VALUES('%s',  (select count(*) from r join transaction_log on r.value = transaction_log.name))", transactionName, transactionName)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to construct query to insert transaction named %s into log.",
+            transactionName
+        );
+        return parsegraph_ERROR;
+    }
+    dbrv = apr_dbd_query(dbd->driver, dbd->handle,  &nrows, buf);
+    if(dbrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Encountered database error while inserting transaction named %s into the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
+        return parsegraph_ERROR;
+    }
     return parsegraph_OK;
 }
 
@@ -1815,12 +1894,32 @@ parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* d
     //ap_log_perror(
         //APLOG_MARK, APLOG_ERR, 0, pool, "Committing transaction %s", transactionName
     //);
-    int nrows = 0;
+    int dbrv;
     char buf[1024];
+    int nrows;
+    if(0 > snprintf(buf, sizeof(buf), "with r(value) as (select '%s') DELETE FROM transaction_log WHERE name = '%s' and level = (select count(*) - 1 from r join transaction_log on r.value = transaction_log.name)", transactionName, transactionName)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to construct query to remove transaction named %s from log.",
+            transactionName
+        );
+        return parsegraph_ERROR;
+    }
+    dbrv = apr_dbd_query(dbd->driver, dbd->handle,  &nrows, buf);
+    if(dbrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Encountered database error while removing transaction named %s from the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
+        return parsegraph_ERROR;
+    }
+    if(nrows != 1) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Unexpected number, %d that is, of transactions named %s removed from the log upon commit.", nrows, transactionName);
+        return parsegraph_ERROR;
+    }
+
     if(0 > snprintf(buf, sizeof(buf), "RELEASE '%s'", transactionName)) {
         return parsegraph_ERROR;
     }
-    int dbrv = apr_dbd_query(
+    dbrv = apr_dbd_query(
         dbd->driver,
         dbd->handle,
         &nrows,
@@ -1833,6 +1932,7 @@ parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* d
         );
         return parsegraph_ERROR;
     }
+
     return parsegraph_OK;
 }
 
@@ -1849,6 +1949,7 @@ parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t*
         );
         return parsegraph_ERROR;
     }
+
     int dbrv = apr_dbd_query(
         dbd->driver,
         dbd->handle,
@@ -1878,6 +1979,21 @@ parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t*
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return -1;
+    }
+
+    if(0 > snprintf(buf, sizeof(buf), "with r(value) as (select '%s') DELETE FROM transaction_log WHERE name = '%s' and level = (select count(*) - 1 from r join transaction_log on r.value = transaction_log.name)", transactionName, transactionName)) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to construct query to remove transaction named %s from log.",
+            transactionName
+        );
+        return parsegraph_ERROR;
+    }
+
+    dbrv = apr_dbd_query(dbd->driver, dbd->handle,  &nrows, buf);
+    if(dbrv != 0) {
+        ap_log_perror(
+            APLOG_MARK, APLOG_ERR, dbrv, pool, "Encountered database error while removing transaction named %s from the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
+        return parsegraph_ERROR;
     }
 
     //ap_log_perror(

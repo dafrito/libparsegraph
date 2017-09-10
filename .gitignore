@@ -9,6 +9,9 @@ lib*.so.*
 
 # Build artifacts
 src/parsegraph_user_install
+src/parsegraph_user_config.h
+parsegraph_user.pc
+parsegraph_user.pc.head
 
 # Autotools artifacts
 stamp*

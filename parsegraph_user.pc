@@ -1,9 +1,0 @@
-prefix=/home/dafrito
-exec_prefix=${prefix}
-
-Name: parsegraph_user
-Version: 1.1
-Description: This C library contains functions for logging in Parsegraph users
-Libs: -L/home/dafrito/lib -lparsegraph_user -lapr-1 -laprutil-1 -fPIC
-Cflags: -I/home/dafrito/include -I/usr/include/httpd -I/usr/include/apr-1
-parsegraph_user_install=/home/dafrito/bin/parsegraph_user_install
