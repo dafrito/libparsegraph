@@ -122,6 +122,7 @@ struct parsegraph_user_login {
     const char* session_token;
     int userId;
 };
+typedef struct parsegraph_user_login parsegraph_user_login;
 
 /**
  * Begins a new user login for the given user, using the given password.
