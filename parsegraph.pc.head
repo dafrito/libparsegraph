@@ -1,0 +1,6 @@
+prefix=/home/dafrito
+exec_prefix=${prefix}
+
+Name: parsegraph
+Version: 1.2
+Description: This C library contains functions for Parsegraph environments

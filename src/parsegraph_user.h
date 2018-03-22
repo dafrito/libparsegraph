@@ -1,12 +1,7 @@
 #ifndef parsegraph_user_INCLUDED
 #define parsegraph_user_INCLUDED
 
-#include <httpd.h>
-#include <http_config.h>
-#include <http_protocol.h>
-#include <ap_config.h>
-#include <apr_dbd.h>
-#include <mod_dbd.h>
+#include "parsegraph_Session.h"
 
 enum parsegraph_UserStatus {
     parsegraph_OK,
@@ -57,8 +52,8 @@ extern const int parsegraph_PASSWORD_SALT_LENGTH;
 extern const int parsegraph_SELECTOR_LENGTH;
 extern const int parsegraph_TOKEN_LENGTH;
 
-const char* parsegraph_constructSessionString(apr_pool_t* pool, const char* session_selector, const char* session_token);
-parsegraph_UserStatus parsegraph_deconstructSessionString(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token);
+const char* parsegraph_constructSessionString(parsegraph_Session* session, const char* session_selector, const char* session_token);
+parsegraph_UserStatus parsegraph_deconstructSessionString(parsegraph_Session* session, const char* sessionValue, const char** session_selector, const char** session_token);
 
 /**
  *
@@ -78,8 +73,7 @@ extern const char* parsegraph_RemoveUser_QUERY;
 extern const char* parsegraph_RefreshUserLogin_QUERY;
 
 parsegraph_UserStatus parsegraph_prepareStatement(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* label,
     const char* query);
 
@@ -87,15 +81,12 @@ parsegraph_UserStatus parsegraph_prepareStatement(
  * Insert any missing SQL queries for the User module with provided defaults.
  */
 parsegraph_UserStatus parsegraph_prepareLoginStatements(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd);
+    parsegraph_Session* session);
 
 /**
  * Creates or upgrades the user tables in the given database connection.
  */
-parsegraph_UserStatus parsegraph_upgradeUserTables(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd);
+parsegraph_UserStatus parsegraph_upgradeUserTables(parsegraph_Session* session);
 
 /**
  * Creates a new user with the given username and password.
@@ -103,8 +94,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
  * Returns 0 on success, or a HTTP status code on failure.
  */
 parsegraph_UserStatus parsegraph_createNewUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* password);
 
@@ -112,8 +102,7 @@ parsegraph_UserStatus parsegraph_createNewUser(
  * Removes the user with the specified username.
  */
 parsegraph_UserStatus parsegraph_removeUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username);
 
 struct parsegraph_user_login {
@@ -133,16 +122,14 @@ typedef struct parsegraph_user_login parsegraph_user_login;
  * The struct and the strings are owned by the provided pool.
  */
 parsegraph_UserStatus parsegraph_beginUserLogin(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* password,
     struct parsegraph_user_login** createdLogin
 );
 
 parsegraph_UserStatus parsegraph_endUserLogin(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     int* logins_ended
 );
@@ -154,8 +141,7 @@ parsegraph_UserStatus parsegraph_endUserLogin(
  * -1 if the login could not be refreshed.
  */
 parsegraph_UserStatus parsegraph_refreshUserLogin(
-    apr_pool_t* pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     struct parsegraph_user_login* createdLogin
 );
 
@@ -164,8 +150,7 @@ parsegraph_UserStatus parsegraph_refreshUserLogin(
  * given database.
  */
 parsegraph_UserStatus parsegraph_listUsers(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     apr_dbd_results_t** res
 );
 
@@ -173,28 +158,25 @@ parsegraph_UserStatus parsegraph_listUsers(
  * Returns whether the named user is in the given database.
  */
 parsegraph_UserStatus parsegraph_getUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd_handle,
+    parsegraph_Session* session,
     apr_dbd_results_t** res,
     const char* username
 );
 
 parsegraph_UserStatus parsegraph_getIdForUsername(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     int* user_id);
 
-parsegraph_UserStatus parsegraph_getUserProfile(apr_pool_t *pool, ap_dbd_t* dbd, const char* username, const char** profile);
-parsegraph_UserStatus parsegraph_setUserProfile(apr_pool_t *pool, ap_dbd_t* dbd, const char* username, const char* profile);
-parsegraph_UserStatus parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size);
-parsegraph_UserStatus parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size);
-parsegraph_UserStatus parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** password_salt_encoded);
-parsegraph_UserStatus parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_size);
-parsegraph_UserStatus parsegraph_generateLogin(apr_pool_t* pool, const char* username, struct parsegraph_user_login** createdLogin);
+parsegraph_UserStatus parsegraph_getUserProfile(parsegraph_Session* session, const char* username, const char** profile);
+parsegraph_UserStatus parsegraph_setUserProfile(parsegraph_Session* session, const char* username, const char* profile);
+parsegraph_UserStatus parsegraph_validateUsername(parsegraph_Session* session, const char* username, size_t* username_size);
+parsegraph_UserStatus parsegraph_validatePassword(parsegraph_Session* session, const char* password, size_t* password_size);
+parsegraph_UserStatus parsegraph_createPasswordSalt(parsegraph_Session* session, size_t salt_len, char** password_salt_encoded);
+parsegraph_UserStatus parsegraph_encryptPassword(parsegraph_Session* session, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_size);
+parsegraph_UserStatus parsegraph_generateLogin(parsegraph_Session* session, const char* username, struct parsegraph_user_login** createdLogin);
 parsegraph_UserStatus parsegraph_changeUserPassword(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* password);
 
@@ -202,18 +184,18 @@ const char* parsegraph_nameUserStatus(parsegraph_UserStatus rv);
 int parsegraph_isSeriousUserError(parsegraph_UserStatus rv);
 int parsegraph_userStatusToHttp(parsegraph_UserStatus rv);
 
-parsegraph_UserStatus parsegraph_grantSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
-parsegraph_UserStatus parsegraph_hasSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* hasSuperadmin);
-parsegraph_UserStatus parsegraph_revokeSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
-parsegraph_UserStatus parsegraph_banUser(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
-parsegraph_UserStatus parsegraph_isBanned(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* isBanned);
-parsegraph_UserStatus parsegraph_unbanUser(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
-parsegraph_UserStatus parsegraph_allowSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
-parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* allowsSubscription);
-parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username);
+parsegraph_UserStatus parsegraph_grantSuperadmin(parsegraph_Session* session, const char* username);
+parsegraph_UserStatus parsegraph_hasSuperadmin(parsegraph_Session* session, const char* username, int* hasSuperadmin);
+parsegraph_UserStatus parsegraph_revokeSuperadmin(parsegraph_Session* session, const char* username);
+parsegraph_UserStatus parsegraph_banUser(parsegraph_Session* session, const char* username);
+parsegraph_UserStatus parsegraph_isBanned(parsegraph_Session* session, const char* username, int* isBanned);
+parsegraph_UserStatus parsegraph_unbanUser(parsegraph_Session* session, const char* username);
+parsegraph_UserStatus parsegraph_allowSubscription(parsegraph_Session* session, const char* username);
+parsegraph_UserStatus parsegraph_allowsSubscription(parsegraph_Session* session, const char* username, int* allowsSubscription);
+parsegraph_UserStatus parsegraph_disallowSubscription(parsegraph_Session* session, const char* username);
 
-parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName);
-parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName);
-parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName);
+parsegraph_UserStatus parsegraph_beginTransaction(parsegraph_Session* session, const char* transactionName);
+parsegraph_UserStatus parsegraph_commitTransaction(parsegraph_Session* session, const char* transactionName);
+parsegraph_UserStatus parsegraph_rollbackTransaction(parsegraph_Session* session, const char* transactionName);
 
 #endif // parsegraph_user_INCLUDED

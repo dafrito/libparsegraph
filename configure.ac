@@ -1,11 +1,11 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([parsegraph_user], [1.2], [dafrito@gmail.com], [parsegraph_user], [https://parsegraph.com])
+AC_INIT([parsegraph], [1.2], [dafrito@gmail.com], [parsegraph], [https://rainback.com])
 AC_SUBST([PACKAGE_RELEASE], [2])
 AM_INIT_AUTOMAKE([-Wall foreign serial-tests subdir-objects])
 AC_CONFIG_SRCDIR([src/parsegraph_user.c])
-AC_CONFIG_HEADERS([src/parsegraph_user_config.h])
+AC_CONFIG_HEADERS([src/parsegraph_config.h])
 AC_CONFIG_MACRO_DIR([m4])
 
 # Check for build programs
@@ -19,19 +19,13 @@ LT_PREREQ([2.2])
 LT_INIT
 AC_PROG_LIBTOOL
 
-# Include Apache
-AC_SUBST(httpd_CFLAGS)
-AC_SUBST(httpd_LIBS)
-httpd_CFLAGS="-I/usr/include/httpd -I/usr/include/apr-1"
-httpd_LIBS="-lapr-1 -laprutil-1 -fPIC"
-
-PKG_CHECK_MODULES(openssl, [openssl],
+PKG_CHECK_MODULES(marla, [marla openssl],
     [],
-    [AC_MSG_ERROR([openssl is required])]
+    [AC_MSG_ERROR([marla and openssl is required])]
 )
 
-AC_SUBST([PACKAGE_DESCRIPTION], ['This C library contains functions for logging in Parsegraph users'])
-AC_SUBST([PACKAGE_SUMMARY], ['User functions for Parsegraph'])
+AC_SUBST([PACKAGE_DESCRIPTION], ['This C library contains functions for Parsegraph environments'])
+AC_SUBST([PACKAGE_SUMMARY], ['Environment functions for Parsegraph'])
 
-AC_CONFIG_FILES([Makefile src/Makefile parsegraph_user.pc.head src/rpm.spec rpm.sh])
+AC_CONFIG_FILES([Makefile src/Makefile parsegraph.pc.head src/rpm.spec rpm.sh])
 AC_OUTPUT

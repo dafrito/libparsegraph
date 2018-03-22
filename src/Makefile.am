@@ -1,47 +1,47 @@
-lib_LTLIBRARIES = libparsegraph_user.la libparsegraph_user_httpd.la
-libparsegraph_user_la_CFLAGS = -Dparsegraph_FULL_VERSION=\"@PACKAGE_VERSION@-@PACKAGE_RELEASE@\" -Wall @httpd_CFLAGS@ @openssl_CFLAGS@
-libparsegraph_user_la_LDFLAGS = @httpd_LIBS@ @openssl_LIBS@ -shared
+lib_LTLIBRARIES = libparsegraph.la
+libparsegraph_la_CFLAGS = -Dparsegraph_FULL_VERSION=\"@PACKAGE_VERSION@-@PACKAGE_RELEASE@\" -Wall @marla_CFLAGS@
+libparsegraph_la_LDFLAGS = @marla_LIBS@ -shared
 
 include_HEADERS = \
 	parsegraph_user.h \
-	parsegraph_user_httpd.h
+	parsegraph_List.h \
+	parsegraph_Session.h
 
-libparsegraph_user_la_SOURCES = \
-	parsegraph_user.c
+libparsegraph_la_SOURCES = \
+	session.c \
+	parsegraph_user.c \
+	parsegraph_List.c
 
-libparsegraph_user_httpd_la_CFLAGS = $(libparsegraph_user_la_CFLAGS)
-libparsegraph_user_httpd_la_LDFLAGS = -lparsegraph_user $(libparsegraph_user_la_LDFLAGS)
+bin_PROGRAMS = parsegraph_install
 
-libparsegraph_user_httpd_la_SOURCES = \
-	parsegraph_user_httpd.c
-
-bin_PROGRAMS = parsegraph_user_install
-
-parsegraph_user_install_CFLAGS = \
-	$(libparsegraph_user_la_CFLAGS) \
+parsegraph_install_CFLAGS = \
+	$(libparsegraph_la_CFLAGS) \
 	-I$(top_SRCDIR)
-parsegraph_user_install_LDFLAGS = $(libparsegraph_user_la_LDFLAGS)
-parsegraph_user_install_LDADD = libparsegraph_user.la
+parsegraph_install_LDFLAGS = $(libparsegraph_la_LDFLAGS)
+parsegraph_install_LDADD = libparsegraph.la
 
-# Install to Apache
-#install-exec-hook:
-#	rm -f /usr/lib64/httpd/modules/parsegraph_user.so
-#	ln -s /usr/lib64/parsegraph_user.so /usr/lib64/httpd/modules
+check_PROGRAMS = runtest_user
+runtest_user_CFLAGS = \
+	$(libparsegraph_la_CFLAGS) \
+	-I$(top_SRCDIR) \
+	-I$(top_SRCDIR)/src/tests
+runtest_user_LDFLAGS = $(libparsegraph_la_LDFLAGS)
+runtest_user_LDADD = libparsegraph.la
 
-check_PROGRAMS = runtest
-runtest_CFLAGS = \
-	$(libparsegraph_user_la_CFLAGS) \
+check_PROGRAMS += runtest_list
+runtest_list_CFLAGS = \
+	$(libparsegraph_la_CFLAGS) \
 	-I$(top_SRCDIR)
-runtest_LDFLAGS = $(libparsegraph_user_la_LDFLAGS)
-runtest_LDADD = libparsegraph_user.la
+runtest_list_LDFLAGS = $(libparsegraph_la_LDFLAGS)
+runtest_list_LDADD = libparsegraph.la
 
-noinst_HEADERS = \
-	tests/unity.h \
-	tests/unity_internals.h
+runtest_list_SOURCES = \
+	tests/test_List.c \
+	tests/unity.c
 
-runtest_SOURCES = \
+runtest_user_SOURCES = \
 	tests/test_user.c \
 	tests/unity.c
 
-dist_check_SCRIPTS = tests/test_parsegraph_user_install.sh
-TESTS = $(check_PROGRAMS) tests/test_parsegraph_user_install.sh
+dist_check_SCRIPTS = tests/test_parsegraph_install.sh
+TESTS = $(check_PROGRAMS) tests/test_parsegraph_install.sh

@@ -1,10 +1,10 @@
 #include "parsegraph_user.h"
+#include <marla.h>
 
 #include <openssl/sha.h>
 #include <apr_strings.h>
 #include <apr_lib.h>
 #include <apr_base64.h>
-#include <http_log.h>
 
 const char* parsegraph_nameUserStatus(parsegraph_UserStatus rv)
 {
@@ -85,11 +85,10 @@ int parsegraph_userStatusToHttp(parsegraph_UserStatus rv)
     }
 }
 
-parsegraph_UserStatus parsegraph_prepareLoginStatements(
-    apr_pool_t* pool,
-    ap_dbd_t* dbd
-)
+parsegraph_UserStatus parsegraph_prepareLoginStatements(parsegraph_Session* session)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     static const char* queries[] = {
         "parsegraph_user_getUser", "SELECT id, password, password_salt, profile FROM user WHERE username = %s", // 1
         "parsegraph_user_createNewUser", "INSERT INTO user(username, password, password_salt) VALUES(%s, %s, %s)", // 2
@@ -126,8 +125,7 @@ parsegraph_UserStatus parsegraph_prepareLoginStatements(
         apr_dbd_prepared_t *stmt;
         int rv = apr_dbd_prepare(dbd->driver, pool, dbd->handle, query, label, &stmt);
         if(rv) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, rv, pool, "Failed preparing %s statement [%s]",
+            marla_logMessagef(session->server, "Failed preparing %s statement [%s]",
                 label,
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
@@ -139,11 +137,10 @@ parsegraph_UserStatus parsegraph_prepareLoginStatements(
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_upgradeUserTables(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd
-)
+parsegraph_UserStatus parsegraph_upgradeUserTables(parsegraph_Session* session)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     int nrows;
     int rv = apr_dbd_query(
         dbd->driver,
@@ -152,8 +149,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         "create table if not exists transaction_log(name text, level int)"
     );
     if(rv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Transaction_log creation query failed to execute: %s",
+        marla_logMessagef(session->server, "Transaction_log creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
         return parsegraph_ERROR;
@@ -161,7 +157,7 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
 
     const char* transactionName = "parsegraph_upgradeUserTables";
 
-    rv = parsegraph_beginTransaction(pool, dbd, transactionName);
+    rv = parsegraph_beginTransaction(session, transactionName);
     if(rv != 0) {
         return rv;
     }
@@ -180,11 +176,11 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         ")"
     );
     if(rv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "User table creation query failed to execute: %s",
+        marla_logMessagef(
+            session->server, "User table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -200,11 +196,11 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         ")"
     );
     if(rv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Login table creation query failed to execute: %s",
+        marla_logMessagef(
+            session->server, "Login table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -217,11 +213,11 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         ")"
     );
     if(rv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version table creation query failed to execute: %s",
+        marla_logMessagef(
+            session->server, "parsegraph_user_version table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -235,11 +231,11 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         0
     );
     if(rv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Login table creation query failed to execute: %s",
+        marla_logMessagef(
+            session->server, "Login table creation query failed to execute: %s",
             apr_dbd_error(dbd->driver, dbd->handle, rv)
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
     apr_dbd_row_t* versionRow = NULL;
@@ -252,10 +248,10 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         case APR_ENOENT:
             break;
         case APR_EGENERAL:
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version retrieval failed."
+            marla_logMessagef(
+                session->server, "parsegraph_user_version version retrieval failed."
             );
-            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            parsegraph_rollbackTransaction(session, transactionName);
             return parsegraph_ERROR;
         }
     }
@@ -268,11 +264,11 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             "insert into parsegraph_user_version(version) values(0);"
         );
         if(rv != 0) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version table creation query failed to execute: %s",
+            marla_logMessagef(
+                session->server, "parsegraph_user_version table creation query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            parsegraph_rollbackTransaction(session, transactionName);
             return parsegraph_ERROR;
         }
     }
@@ -287,12 +283,12 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         for(int i = 0; i < sizeof(upgrade)/sizeof(*upgrade); ++i) {
             rv = apr_dbd_query(dbd->driver, dbd->handle, &nrows, upgrade[i]);
             if(rv != 0) {
-                ap_log_perror(
-                    APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user upgrade to version 1 command %d failed to execute: %s",
+                marla_logMessagef(
+                    session->server, "parsegraph_user upgrade to version 1 command %d failed to execute: %s",
                     i,
                     apr_dbd_error(dbd->driver, dbd->handle, rv)
                 );
-                parsegraph_rollbackTransaction(pool, dbd, transactionName);
+                parsegraph_rollbackTransaction(session, transactionName);
                 return -1;
             }
         }
@@ -305,19 +301,19 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             "update parsegraph_user_version set version = 1"
         );
         if(rv != 0) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
+            marla_logMessagef(
+                session->server, "parsegraph_user_version version update query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            parsegraph_rollbackTransaction(session, transactionName);
             return parsegraph_ERROR;
         }
         if(nrowsUpdated != 1) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of parsegraph_user_version rows updated: %s",
+            marla_logMessagef(
+                session->server, "Unexpected number of parsegraph_user_version rows updated: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            parsegraph_rollbackTransaction(session, transactionName);
             return parsegraph_ERROR;
         }
 
@@ -330,12 +326,12 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         for(int i = 0; i < sizeof(upgrade)/sizeof(*upgrade); ++i) {
             rv = apr_dbd_query(dbd->driver, dbd->handle, &nrows, upgrade[i]);
             if(rv != 0) {
-                ap_log_perror(
-                    APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user upgrade to version 2 command %d failed to execute: %s",
+                marla_logMessagef(
+                    session->server, "parsegraph_user upgrade to version 2 command %d failed to execute: %s",
                     i,
                     apr_dbd_error(dbd->driver, dbd->handle, rv)
                 );
-                parsegraph_rollbackTransaction(pool, dbd, transactionName);
+                parsegraph_rollbackTransaction(session, transactionName);
                 return -1;
             }
         }
@@ -348,16 +344,16 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             "update parsegraph_user_version set version = 2"
         );
         if(rv != 0) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
+            marla_logMessagef(
+                session->server, "parsegraph_user_version version update query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            parsegraph_rollbackTransaction(session, transactionName);
             return parsegraph_ERROR;
         }
         if(nrowsUpdated != 1) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of parsegraph_user_version rows updated: %s",
+            marla_logMessagef(
+                session->server, "Unexpected number of parsegraph_user_version rows updated: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
         }
@@ -365,13 +361,13 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         version = 2;
     }
 
-    rv = parsegraph_commitTransaction(pool, dbd, transactionName);
+    rv = parsegraph_commitTransaction(session, transactionName);
     if(rv != parsegraph_OK) {
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return rv;
     }
 
-    rv = parsegraph_beginTransaction(pool, dbd, transactionName);
+    rv = parsegraph_beginTransaction(session, transactionName);
     if(rv != 0) {
         return rv;
     }
@@ -382,12 +378,12 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         for(int i = 0; i < sizeof(upgrade)/sizeof(*upgrade); ++i) {
             rv = apr_dbd_query(dbd->driver, dbd->handle, &nrows, upgrade[i]);
             if(rv != 0) {
-                ap_log_perror(
-                    APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user upgrade to version 3 command %d failed to execute: %s",
+                marla_logMessagef(
+                    session->server, "parsegraph_user upgrade to version 3 command %d failed to execute: %s",
                     i,
                     apr_dbd_error(dbd->driver, dbd->handle, rv)
                 );
-                parsegraph_rollbackTransaction(pool, dbd, transactionName);
+                parsegraph_rollbackTransaction(session, transactionName);
                 return -1;
             }
         }
@@ -400,16 +396,16 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
             "update parsegraph_user_version set version = 3"
         );
         if(rv != 0) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "parsegraph_user_version version update query failed to execute: %s",
+            marla_logMessagef(
+                session->server, "parsegraph_user_version version update query failed to execute: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
-            parsegraph_rollbackTransaction(pool, dbd, transactionName);
+            parsegraph_rollbackTransaction(session, transactionName);
             return parsegraph_ERROR;
         }
         if(nrowsUpdated != 1) {
-            ap_log_perror(
-                APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of parsegraph_user_version rows updated: %s",
+            marla_logMessagef(
+                session->server, "Unexpected number of parsegraph_user_version rows updated: %s",
                 apr_dbd_error(dbd->driver, dbd->handle, rv)
             );
         }
@@ -417,20 +413,18 @@ parsegraph_UserStatus parsegraph_upgradeUserTables(
         version = 3;
     }
 
-    rv = parsegraph_commitTransaction(pool, dbd, transactionName);
+    rv = parsegraph_commitTransaction(session, transactionName);
     if(rv != parsegraph_OK) {
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return rv;
     }
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)
+parsegraph_UserStatus parsegraph_validateUsername(parsegraph_Session* session, const char* username, size_t* username_size)
 {
     if(!username) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "username must not be null."
-        );
+        marla_logMessagef(session->server, "username must not be null.");
         return parsegraph_ERROR;
     }
     *username_size = strnlen(username, parsegraph_USERNAME_MAX_LENGTH + 1);
@@ -461,12 +455,10 @@ parsegraph_UserStatus parsegraph_validateUsername(apr_pool_t* pool, const char* 
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size)
+parsegraph_UserStatus parsegraph_validatePassword(parsegraph_Session* session, const char* password, size_t* password_size)
 {
     if(!password) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "password must not be null."
-        );
+        marla_logMessage(session->server, "password must not be null.");
         return parsegraph_ERROR;
     }
 
@@ -482,13 +474,12 @@ parsegraph_UserStatus parsegraph_validatePassword(apr_pool_t* pool, const char* 
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_createPasswordSalt(apr_pool_t* pool, size_t salt_len, char** password_salt_encoded)
+parsegraph_UserStatus parsegraph_createPasswordSalt(parsegraph_Session* session, size_t salt_len, char** password_salt_encoded)
 {
+    apr_pool_t* pool = session->pool;
     char* password_salt = apr_pcalloc(pool, salt_len);
     if(0 != apr_generate_random_bytes((unsigned char*)password_salt, salt_len)) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate password salt."
-        );
+        marla_logMessagef(session->server, "Failed to generate password salt.");
         return parsegraph_ERROR;
     }
     *password_salt_encoded = (char*)apr_pcalloc(pool, apr_base64_encode_len(salt_len) + 1);
@@ -497,19 +488,16 @@ parsegraph_UserStatus parsegraph_createPasswordSalt(apr_pool_t* pool, size_t sal
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_encryptPassword(apr_pool_t* pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)
+parsegraph_UserStatus parsegraph_encryptPassword(parsegraph_Session* session, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)
 {
+    apr_pool_t* pool = session->pool;
     // Validate arguments.
     if(!password_hash_encoded) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "password_hash_encoded must not be null."
-        );
+        marla_logMessagef(session->server, "password_hash_encoded must not be null.");
         return parsegraph_ERROR;
     }
     if(!password_salt_encoded) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "password_salt_encoded must not be null."
-        );
+        marla_logMessagef(session->server, "password_salt_encoded must not be null.");
         return parsegraph_ERROR;
     }
 
@@ -545,21 +533,21 @@ const int parsegraph_PASSWORD_SALT_LENGTH = 12;
 const int parsegraph_SELECTOR_LENGTH = 32;
 const int parsegraph_TOKEN_LENGTH = 128;
 
-const char* parsegraph_constructSessionString(apr_pool_t* pool, const char* session_selector, const char* session_token)
+const char* parsegraph_constructSessionString(parsegraph_Session* session, const char* session_selector, const char* session_token)
 {
-    return apr_pstrcat(pool, session_selector, "$", session_token, NULL);
+    return apr_pstrcat(session->pool, session_selector, "$", session_token, NULL);
 }
 
-parsegraph_UserStatus parsegraph_deconstructSessionString(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token)
+parsegraph_UserStatus parsegraph_deconstructSessionString(parsegraph_Session* session, const char* sessionValue, const char** session_selector, const char** session_token)
 {
+    apr_pool_t* pool = session->pool;
     size_t expectedLen = (apr_base64_encode_len(parsegraph_SELECTOR_LENGTH) - 1) + 1 + (apr_base64_encode_len(parsegraph_TOKEN_LENGTH) - 1);
     size_t sessLen = strnlen(sessionValue, expectedLen);
     if(
         sessLen != expectedLen ||
         sessionValue[apr_base64_encode_len(parsegraph_SELECTOR_LENGTH) - 1] != '$'
     ) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Session value is malformed. (%zu expected, %zu given)", expectedLen, sessLen
+        marla_logMessagef(session->server, "Session value is malformed. (%zu expected, %zu given)", expectedLen, sessLen
         );
         return parsegraph_SESSION_MALFORMED;
     }
@@ -575,29 +563,30 @@ parsegraph_UserStatus parsegraph_deconstructSessionString(apr_pool_t* pool, cons
 }
 
 parsegraph_UserStatus parsegraph_createNewUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* password)
 {
+    apr_pool_t *pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Validate the username.
     size_t username_size;
     parsegraph_UserStatus rv;
-    rv = parsegraph_validateUsername(pool, username, &username_size);
+    rv = parsegraph_validateUsername(session, username, &username_size);
     if(rv != parsegraph_OK) {
         return rv;
     }
 
     // Validate the password.
     size_t password_size;
-    rv = parsegraph_validatePassword(pool, password, &password_size);
+    rv = parsegraph_validatePassword(session, password, &password_size);
     if(rv != parsegraph_OK) {
         return rv;
     }
 
     apr_dbd_results_t* res = NULL;
     rv = parsegraph_getUser(
-        pool, dbd, &res, username
+        session, &res, username
     );
     if(rv != parsegraph_OK) {
         // Failed to query for user.
@@ -618,12 +607,12 @@ parsegraph_UserStatus parsegraph_createNewUser(
 
     // Generate the encrypted password.
     char* password_salt_encoded;
-    rv = parsegraph_createPasswordSalt(pool, parsegraph_PASSWORD_SALT_LENGTH, &password_salt_encoded);
+    rv = parsegraph_createPasswordSalt(session, parsegraph_PASSWORD_SALT_LENGTH, &password_salt_encoded);
     if(rv != parsegraph_OK) {
         return rv;
     }
     char* password_hash_encoded;
-    parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded));
+    parsegraph_encryptPassword(session, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded));
 
     // Insert the new user into the database.
     const char* queryName = "parsegraph_user_createNewUser";
@@ -631,9 +620,7 @@ parsegraph_UserStatus parsegraph_createNewUser(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
-        );
+        marla_logMessagef(session->server, "%s query was not defined.", queryName);
         return parsegraph_ERROR;
     }
     int nrows = 0;
@@ -648,21 +635,21 @@ parsegraph_UserStatus parsegraph_createNewUser(
         password_salt_encoded
     );
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute: %s", queryName,
+        marla_logMessagef(session->server,
+            "%s query failed to execute: %s", queryName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
     if(nrows == 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "User %s was not inserted despite query.", username
+        marla_logMessagef(session->server,
+            "User %s was not inserted despite query.", username
         );
         return parsegraph_ERROR;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions for %s: %d insertion(s).", username, nrows
+        marla_logMessagef(session->server,
+            "Unexpected number of insertions for %s: %d insertion(s).", username, nrows
         );
         return parsegraph_ERROR;
     }
@@ -671,29 +658,30 @@ parsegraph_UserStatus parsegraph_createNewUser(
 }
 
 parsegraph_UserStatus parsegraph_changeUserPassword(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* password)
 {
+    ap_dbd_t* dbd = session->dbd;
+    apr_pool_t* pool = session->pool;
     // Validate the username.
     size_t username_size;
     parsegraph_UserStatus rv;
-    rv = parsegraph_validateUsername(pool, username, &username_size);
+    rv = parsegraph_validateUsername(session, username, &username_size);
     if(rv != parsegraph_OK) {
         return rv;
     }
 
     // Validate the password.
     size_t password_size;
-    rv = parsegraph_validatePassword(pool, password, &password_size);
+    rv = parsegraph_validatePassword(session, password, &password_size);
     if(rv != parsegraph_OK) {
         return rv;
     }
 
     apr_dbd_results_t* res = NULL;
     rv = parsegraph_getUser(
-        pool, dbd, &res, username
+        session, &res, username
     );
     if(rv != parsegraph_OK) {
         // Failed to query for user.
@@ -702,7 +690,7 @@ parsegraph_UserStatus parsegraph_changeUserPassword(
     apr_dbd_row_t* row;
     int dbrv = apr_dbd_get_row(
         dbd->driver,
-        pool,
+        session->pool,
         res,
         &row,
         -1
@@ -713,14 +701,12 @@ parsegraph_UserStatus parsegraph_changeUserPassword(
 
     // Generate the encrypted password.
     char* password_salt_encoded;
-    if(0 != parsegraph_createPasswordSalt(pool, parsegraph_PASSWORD_SALT_LENGTH, &password_salt_encoded)) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password salt must not be null."
-        );
+    if(0 != parsegraph_createPasswordSalt(session, parsegraph_PASSWORD_SALT_LENGTH, &password_salt_encoded)) {
+        marla_logMessage(session->server, "Password salt must not be null.");
         return parsegraph_ERROR;
     }
     char* password_hash_encoded;
-    parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded));
+    parsegraph_encryptPassword(session, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded));
 
     // Change the password.
     const char* queryName = "parsegraph_user_changeUserPassword";
@@ -728,9 +714,7 @@ parsegraph_UserStatus parsegraph_changeUserPassword(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
-        );
+        marla_logMessagef(session->server, "%s query was not defined.", queryName);
         return parsegraph_ERROR;
     }
     int nrows = 0;
@@ -745,21 +729,20 @@ parsegraph_UserStatus parsegraph_changeUserPassword(
         username
     );
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute: %s", queryName,
+        marla_logMessagef(session->server, "%s query failed to execute: %s", queryName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
     if(nrows == 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Password %s was not changed despite query.", username
+        marla_logMessagef(session->server,
+            "Password %s was not changed despite query.", username
         );
         return parsegraph_ERROR;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of updates for %s: %d change(s).", username, nrows
+        marla_logMessagef(session->server,
+            "Unexpected number of updates for %s: %d change(s).", username, nrows
         );
         return parsegraph_ERROR;
     }
@@ -768,21 +751,22 @@ parsegraph_UserStatus parsegraph_changeUserPassword(
 }
 
 parsegraph_UserStatus parsegraph_removeUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username)
 {
+    ap_dbd_t* dbd = session->dbd;
+    apr_pool_t* pool = session->pool;
     // Validate the username.
     size_t username_size;
     parsegraph_UserStatus rv;
-    rv = parsegraph_validateUsername(pool, username, &username_size);
+    rv = parsegraph_validateUsername(session, username, &username_size);
     if(rv != parsegraph_OK) {
         return rv;
     }
 
     // End existing user logins.
     int logins_ended;
-    rv = parsegraph_endUserLogin(pool, dbd, username, &logins_ended);
+    rv = parsegraph_endUserLogin(session, username, &logins_ended);
     if(rv != parsegraph_OK) {
         return rv;
     }
@@ -793,10 +777,7 @@ parsegraph_UserStatus parsegraph_removeUser(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
-            queryName
-        );
+        marla_logMessagef(session->server, "%s query was not defined.", queryName);
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
     int nrows = 0;
@@ -811,8 +792,7 @@ parsegraph_UserStatus parsegraph_removeUser(
 
     // Confirm removal result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server, "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -822,8 +802,8 @@ parsegraph_UserStatus parsegraph_removeUser(
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of users removed; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of users removed; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -833,17 +813,18 @@ parsegraph_UserStatus parsegraph_removeUser(
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_generateLogin(apr_pool_t* pool, const char* username, struct parsegraph_user_login** createdLogin)
+parsegraph_UserStatus parsegraph_generateLogin(parsegraph_Session* session, const char* username, struct parsegraph_user_login** createdLogin)
 {
+    apr_pool_t* pool = session->pool;
     // Generate the selector and token.
     char* selector = apr_pcalloc(pool, parsegraph_SELECTOR_LENGTH);
     if(0 != apr_generate_random_bytes((unsigned char*)selector, parsegraph_SELECTOR_LENGTH)) {
-        ap_log_perror(APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate selector.");
+        marla_logMessagef(session->server, "Failed to generate selector.");
         return parsegraph_ERROR;
     }
     char* token = apr_pcalloc(pool, parsegraph_TOKEN_LENGTH);
     if(0 != apr_generate_random_bytes((unsigned char*)token, parsegraph_TOKEN_LENGTH)) {
-        ap_log_perror(APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate token.");
+        marla_logMessagef(session->server, "Failed to generate token.");
         return parsegraph_ERROR;
     }
 
@@ -875,23 +856,23 @@ parsegraph_UserStatus parsegraph_generateLogin(apr_pool_t* pool, const char* use
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* dbd, struct parsegraph_user_login* createdLogin)
+parsegraph_UserStatus parsegraph_refreshUserLogin(parsegraph_Session* session, struct parsegraph_user_login* createdLogin)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     if(!createdLogin) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "No login was provided."
-        );
+        marla_logMessagef(session->server, "No login was provided.");
         return parsegraph_ERROR;
     }
     if(!createdLogin->session_selector) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "No login session selector was provided."
+        marla_logMessagef(session->server,
+            "No login session selector was provided."
         );
         return parsegraph_ERROR;
     }
     if(!createdLogin->session_token) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "No login session token was provided."
+        marla_logMessagef(session->server,
+            "No login session token was provided."
         );
         return parsegraph_ERROR;
     }
@@ -903,9 +884,7 @@ parsegraph_UserStatus parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* db
     );
     if(query == NULL) {
          // Query was not defined.
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
-        );
+        marla_logMessagef(session->server, "%s query was not defined.", queryName);
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
 
@@ -921,10 +900,7 @@ parsegraph_UserStatus parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* db
         createdLogin->session_token
     );
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute: [%s]", queryName,
-            apr_dbd_error(dbd->driver, dbd->handle, dbrv)
-        );
+        marla_logMessagef(session->server, "%s query failed to execute: [%s]", queryName, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
         return parsegraph_ERROR;
     }
 
@@ -948,12 +924,10 @@ parsegraph_UserStatus parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* db
     );
     size_t username_size;
     if(!username) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "username must not be null."
-        );
+        marla_logMessagef(session->server, "username must not be null.");
         return parsegraph_ERROR;
     }
-    parsegraph_UserStatus rv = parsegraph_validateUsername(pool, username, &username_size);
+    parsegraph_UserStatus rv = parsegraph_validateUsername(session, username, &username_size);
     if(rv != parsegraph_OK) {
         return rv;
     }
@@ -962,29 +936,30 @@ parsegraph_UserStatus parsegraph_refreshUserLogin(apr_pool_t* pool, ap_dbd_t* db
 }
 
 parsegraph_UserStatus parsegraph_beginUserLogin(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* password,
     struct parsegraph_user_login** createdLogin)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     const char* transactionName = "parsegraph_beginUserLogin";
 
     // Validate the username.
     size_t username_size;
-    parsegraph_UserStatus rv = parsegraph_validateUsername(pool, username, &username_size);
+    parsegraph_UserStatus rv = parsegraph_validateUsername(session, username, &username_size);
     if(parsegraph_OK != rv) {
         return rv;
     }
 
     // Validate the password.
     size_t password_size;
-    rv = parsegraph_validatePassword(pool, password, &password_size);
+    rv = parsegraph_validatePassword(session, password, &password_size);
     if(parsegraph_OK != rv) {
         return rv;
     }
 
-    rv = parsegraph_beginTransaction(pool, dbd, transactionName);
+    rv = parsegraph_beginTransaction(session, transactionName);
     if(rv != parsegraph_OK) {
         return rv;
     }
@@ -992,10 +967,10 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
     // Check for an existing user.
     apr_dbd_results_t* res = NULL;
     rv = parsegraph_getUser(
-        pool, dbd, &res, username
+        session, &res, username
     );
     if(parsegraph_OK != rv) {
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return rv;
     }
     apr_dbd_row_t* row;
@@ -1007,7 +982,7 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         -1
     );
     if(dbrv != 0) {
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_USER_DOES_NOT_EXIST;
     }
 
@@ -1022,16 +997,12 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
     case APR_SUCCESS:
         break;
     case APR_ENOENT:
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "user_id must not be null for %s", username
-        );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        marla_logMessagef(session->server, "user_id must not be null for %s", username);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     case APR_EGENERAL:
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve user_id for %s", username
-        );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        marla_logMessagef(session->server, "Failed to retrieve user_id for %s", username);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -1041,19 +1012,15 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         2
     );
     if(!password_salt_encoded) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "password_salt_encoded must not be null."
-        );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        marla_logMessagef(session->server, "password_salt_encoded must not be null.");
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
 
     char* password_hash_encoded;
-    if(0 != parsegraph_encryptPassword(pool, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded))) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to generate encrypted password."
-        );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+    if(0 != parsegraph_encryptPassword(session, password, password_size, &password_hash_encoded, password_salt_encoded, strlen(password_salt_encoded))) {
+        marla_logMessagef(session->server, "Failed to generate encrypted password.");
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -1063,29 +1030,27 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         1
     );
     if(!expected_hash_encoded) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Expected_hash must not be null."
-        );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        marla_logMessagef(session->server, "Expected_hash must not be null.");
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
     if(0 != strcmp(expected_hash_encoded, (const char*)password_hash_encoded)) {
         // Given password doesn't match the password in the database.
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_INVALID_PASSWORD;
     }
 
     // Passwords match, so create a login.
-    rv = parsegraph_generateLogin(pool, username, createdLogin);
+    rv = parsegraph_generateLogin(session, username, createdLogin);
     if(parsegraph_OK != rv) {
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return rv;
     }
     int userId;
-    parsegraph_UserStatus idRV = parsegraph_getIdForUsername(pool, dbd, username, &userId);
+    parsegraph_UserStatus idRV = parsegraph_getIdForUsername(session, username, &userId);
     if(parsegraph_isSeriousUserError(idRV)) {
-        ap_log_perror(APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve ID for generated login.");
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        marla_logMessagef(session->server, "Failed to retrieve ID for generated login.");
+        parsegraph_rollbackTransaction(session, transactionName);
         return idRV;
     }
     (*createdLogin)->userId = userId;
@@ -1097,10 +1062,8 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
     );
     if(query == NULL) {
          // Query was not defined.
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
-        );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        marla_logMessagef(session->server, "%s query was not defined.", queryName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
 
@@ -1116,49 +1079,48 @@ parsegraph_UserStatus parsegraph_beginUserLogin(
         (*createdLogin)->session_token
     );
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query failed to execute: [%s]", queryName,
+        marla_logMessagef(session->server,
+            "%s query failed to execute: [%s]", queryName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
     if(nrows == 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Login for %s was not inserted despite query.", username
+        marla_logMessagef(session->server,
+            "Login for %s was not inserted despite query.", username
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of insertions for %s. Got %d insertion(s)", username, nrows
+        marla_logMessagef(session->server,
+            "Unexpected number of insertions for %s. Got %d insertion(s)", username, nrows
         );
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return parsegraph_ERROR;
     }
-    rv = parsegraph_commitTransaction(pool, dbd, transactionName);
+    rv = parsegraph_commitTransaction(session, transactionName);
     if(rv != parsegraph_OK) {
-        parsegraph_rollbackTransaction(pool, dbd, transactionName);
+        parsegraph_rollbackTransaction(session, transactionName);
         return rv;
     }
     return parsegraph_OK;
 }
 
 parsegraph_UserStatus parsegraph_endUserLogin(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     int* logins_ended
 )
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Validate the username.
     size_t username_size;
-    parsegraph_UserStatus rv = parsegraph_validateUsername(pool, username, &username_size);
+    parsegraph_UserStatus rv = parsegraph_validateUsername(session, username, &username_size);
     if(parsegraph_OK != rv) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to validate username."
-        );
+        marla_logMessagef(session->server, "Failed to validate username.");
         return rv;
     }
 
@@ -1168,9 +1130,7 @@ parsegraph_UserStatus parsegraph_endUserLogin(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
-        );
+        marla_logMessagef(session->server, "%s query was not defined.", queryName);
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
 
@@ -1183,8 +1143,8 @@ parsegraph_UserStatus parsegraph_endUserLogin(
         username
     );
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to end user login [%s]",
+        marla_logMessagef(session->server,
+            "Failed to end user login [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1193,18 +1153,19 @@ parsegraph_UserStatus parsegraph_endUserLogin(
 }
 
 parsegraph_UserStatus parsegraph_listUsers(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     apr_dbd_results_t** res)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Get and run the query.
     const char* queryName = "parsegraph_user_listUsers";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
+        marla_logMessagef(session->server,
+            "%s query was not defined.", queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
@@ -1217,8 +1178,8 @@ parsegraph_UserStatus parsegraph_listUsers(
         0
     );
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to list users [%s]",
+        marla_logMessagef(session->server,
+            "Failed to list users [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1227,11 +1188,12 @@ parsegraph_UserStatus parsegraph_listUsers(
 }
 
 parsegraph_UserStatus parsegraph_getUser(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     apr_dbd_results_t** res,
     const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Get and run the query.
     const char* queryName = "parsegraph_user_getUser";
     apr_dbd_prepared_t* query = apr_hash_get(
@@ -1239,8 +1201,8 @@ parsegraph_UserStatus parsegraph_getUser(
     );
     if(query == NULL) {
          // Query was not defined.
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.", queryName
+        marla_logMessagef(session->server,
+            "%s query was not defined.", queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
     }
@@ -1254,8 +1216,8 @@ parsegraph_UserStatus parsegraph_getUser(
         username
     );
     if(0 != dbrv) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to list users [%s]",
+        marla_logMessagef(session->server,
+            "Failed to list users [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1264,14 +1226,15 @@ parsegraph_UserStatus parsegraph_getUser(
 }
 
 parsegraph_UserStatus parsegraph_getIdForUsername(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     int* user_id)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     apr_dbd_results_t* res = NULL;
     parsegraph_UserStatus rv = parsegraph_getUser(
-        pool, dbd, &res, username
+        session, &res, username
     );
     if(parsegraph_OK != rv) {
         return rv;
@@ -1300,21 +1263,22 @@ parsegraph_UserStatus parsegraph_getIdForUsername(
         return parsegraph_OK;
     case APR_ENOENT:
     default:
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve ID for username [%s]", username
+        marla_logMessagef(session->server,
+            "Failed to retrieve ID for username [%s]", username
         );
         return 500;
     }
 }
 
 parsegraph_UserStatus parsegraph_getUserProfile(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char** profile)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     apr_dbd_results_t* res = NULL;
-    parsegraph_UserStatus rv = parsegraph_getUser(pool, dbd, &res, username);
+    parsegraph_UserStatus rv = parsegraph_getUser(session, &res, username);
     if(rv != parsegraph_OK) {
         // Failed to query for user.
         return rv;
@@ -1338,8 +1302,8 @@ parsegraph_UserStatus parsegraph_getUserProfile(
         3
     );
     if(profile == 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to retrieve profile for username."
+        marla_logMessagef(session->server,
+            "Failed to retrieve profile for username."
         );
         return parsegraph_ERROR;
     }
@@ -1347,19 +1311,20 @@ parsegraph_UserStatus parsegraph_getUserProfile(
 }
 
 parsegraph_UserStatus parsegraph_setUserProfile(
-    apr_pool_t *pool,
-    ap_dbd_t* dbd,
+    parsegraph_Session* session,
     const char* username,
     const char* profile)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_setUserProfile";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1377,8 +1342,8 @@ parsegraph_UserStatus parsegraph_setUserProfile(
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1388,8 +1353,8 @@ parsegraph_UserStatus parsegraph_setUserProfile(
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of user profiles edited; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of user profiles edited; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1399,16 +1364,18 @@ parsegraph_UserStatus parsegraph_setUserProfile(
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_grantSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
+parsegraph_UserStatus parsegraph_grantSuperadmin(parsegraph_Session* session, const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_grantSuperadmin";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1425,8 +1392,8 @@ parsegraph_UserStatus parsegraph_grantSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1436,8 +1403,8 @@ parsegraph_UserStatus parsegraph_grantSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of superadmin changes; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of superadmin changes; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1447,16 +1414,18 @@ parsegraph_UserStatus parsegraph_grantSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_hasSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* hasSuperadmin)
+parsegraph_UserStatus parsegraph_hasSuperadmin(parsegraph_Session* session, const char* username, int* hasSuperadmin)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_hasSuperadmin";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1473,8 +1442,8 @@ parsegraph_UserStatus parsegraph_hasSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, 
     );
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1493,8 +1462,8 @@ parsegraph_UserStatus parsegraph_hasSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, 
         *hasSuperadmin = 0;
         break;
     case APR_EGENERAL:
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1503,16 +1472,18 @@ parsegraph_UserStatus parsegraph_hasSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, 
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_revokeSuperadmin(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
+parsegraph_UserStatus parsegraph_revokeSuperadmin(parsegraph_Session* session, const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_revokeSuperadmin";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1529,8 +1500,8 @@ parsegraph_UserStatus parsegraph_revokeSuperadmin(apr_pool_t* pool, ap_dbd_t* db
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1540,8 +1511,8 @@ parsegraph_UserStatus parsegraph_revokeSuperadmin(apr_pool_t* pool, ap_dbd_t* db
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of superadmin changes; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of superadmin changes; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1551,16 +1522,18 @@ parsegraph_UserStatus parsegraph_revokeSuperadmin(apr_pool_t* pool, ap_dbd_t* db
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_banUser(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
+parsegraph_UserStatus parsegraph_banUser(parsegraph_Session* session, const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_banUser";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1577,15 +1550,15 @@ parsegraph_UserStatus parsegraph_banUser(apr_pool_t* pool, ap_dbd_t* dbd, const 
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of ban changes; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of ban changes; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1595,16 +1568,18 @@ parsegraph_UserStatus parsegraph_banUser(apr_pool_t* pool, ap_dbd_t* dbd, const 
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_isBanned(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* isBanned)
+parsegraph_UserStatus parsegraph_isBanned(parsegraph_Session* session, const char* username, int* isBanned)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_isBanned";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1621,8 +1596,8 @@ parsegraph_UserStatus parsegraph_isBanned(apr_pool_t* pool, ap_dbd_t* dbd, const
     );
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1641,8 +1616,8 @@ parsegraph_UserStatus parsegraph_isBanned(apr_pool_t* pool, ap_dbd_t* dbd, const
         *isBanned = 0;
         break;
     case APR_EGENERAL:
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1651,16 +1626,18 @@ parsegraph_UserStatus parsegraph_isBanned(apr_pool_t* pool, ap_dbd_t* dbd, const
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_unbanUser(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
+parsegraph_UserStatus parsegraph_unbanUser(parsegraph_Session* session, const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_unbanUser";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1677,8 +1654,8 @@ parsegraph_UserStatus parsegraph_unbanUser(apr_pool_t* pool, ap_dbd_t* dbd, cons
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1688,8 +1665,8 @@ parsegraph_UserStatus parsegraph_unbanUser(apr_pool_t* pool, ap_dbd_t* dbd, cons
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of ban changes; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of ban changes; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1699,16 +1676,18 @@ parsegraph_UserStatus parsegraph_unbanUser(apr_pool_t* pool, ap_dbd_t* dbd, cons
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_allowSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
+parsegraph_UserStatus parsegraph_allowSubscription(parsegraph_Session* session, const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_allowSubscription";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1725,8 +1704,8 @@ parsegraph_UserStatus parsegraph_allowSubscription(apr_pool_t* pool, ap_dbd_t* d
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1736,8 +1715,8 @@ parsegraph_UserStatus parsegraph_allowSubscription(apr_pool_t* pool, ap_dbd_t* d
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of subscription changes; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of subscription changes; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1747,16 +1726,18 @@ parsegraph_UserStatus parsegraph_allowSubscription(apr_pool_t* pool, ap_dbd_t* d
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username, int* allowsSubscription)
+parsegraph_UserStatus parsegraph_allowsSubscription(parsegraph_Session* session, const char* username, int* allowsSubscription)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     // Set the profile
     const char* queryName = "parsegraph_user_allowsSubscription";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1773,8 +1754,8 @@ parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* 
     );
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1793,8 +1774,8 @@ parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* 
         *allowsSubscription = 0;
         break;
     case APR_EGENERAL:
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1803,15 +1784,17 @@ parsegraph_UserStatus parsegraph_allowsSubscription(apr_pool_t* pool, ap_dbd_t* 
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t* dbd, const char* username)
+parsegraph_UserStatus parsegraph_disallowSubscription(parsegraph_Session* session, const char* username)
 {
+    apr_pool_t* pool = session->pool;
+    ap_dbd_t* dbd = session->dbd;
     const char* queryName = "parsegraph_user_disallowSubscription";
     apr_dbd_prepared_t* query = apr_hash_get(
         dbd->prepared, queryName, APR_HASH_KEY_STRING
     );
     if(query == NULL) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "%s query was not defined.",
+        marla_logMessagef(session->server,
+            "%s query was not defined.",
             queryName
         );
         return parsegraph_UNDEFINED_PREPARED_STATEMENT;
@@ -1828,8 +1811,8 @@ parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t
 
     // Confirm result.
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Query failed to execute. [%s]",
+        marla_logMessagef(session->server,
+            "Query failed to execute. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
@@ -1839,8 +1822,8 @@ parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t
         return parsegraph_OK;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Unexpected number of subscription changes; expected 1, got %d",
+        marla_logMessagef(session->server,
+            "Unexpected number of subscription changes; expected 1, got %d",
             nrows
         );
         return parsegraph_ERROR;
@@ -1850,10 +1833,11 @@ parsegraph_UserStatus parsegraph_disallowSubscription(apr_pool_t* pool, ap_dbd_t
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName)
+parsegraph_UserStatus parsegraph_beginTransaction(parsegraph_Session* session, const char* transactionName)
 {
-    //ap_log_perror(
-        //APLOG_MARK, APLOG_ERR, 0, pool, "Beginning transaction %s", transactionName
+    ap_dbd_t* dbd = session->dbd;
+    //marla_logMessagef(
+        //session->server, "Beginning transaction %s", transactionName
     //);
     int nrows = 0;
     char buf[1024];
@@ -1866,53 +1850,54 @@ parsegraph_UserStatus parsegraph_beginTransaction(apr_pool_t* pool, ap_dbd_t* db
         &nrows,
         buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to create savepoint for transaction. [%s]",
+        marla_logMessagef(session->server,
+            "Failed to create savepoint for transaction. [%s]",
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
         return parsegraph_ERROR;
     }
 
     if(0 > snprintf(buf, sizeof(buf), "WITH r(value) as (select '%s') INSERT INTO transaction_log(name, level) VALUES('%s',  (select count(*) from r join transaction_log on r.value = transaction_log.name))", transactionName, transactionName)) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to construct query to insert transaction named %s into log.",
+        marla_logMessagef(session->server,
+            "Failed to construct query to insert transaction named %s into log.",
             transactionName
         );
         return parsegraph_ERROR;
     }
     dbrv = apr_dbd_query(dbd->driver, dbd->handle,  &nrows, buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Encountered database error while inserting transaction named %s into the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
+        marla_logMessagef(session->server,
+            "Encountered database error while inserting transaction named %s into the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
         return parsegraph_ERROR;
     }
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName)
+parsegraph_UserStatus parsegraph_commitTransaction(parsegraph_Session* session, const char* transactionName)
 {
-    //ap_log_perror(
-        //APLOG_MARK, APLOG_ERR, 0, pool, "Committing transaction %s", transactionName
+    ap_dbd_t* dbd = session->dbd;
+    //marla_logMessagef(session->server,
+        //"Committing transaction %s", transactionName
     //);
     int dbrv;
     char buf[1024];
     int nrows;
     if(0 > snprintf(buf, sizeof(buf), "with r(value) as (select '%s') DELETE FROM transaction_log WHERE name = '%s' and level = (select count(*) - 1 from r join transaction_log on r.value = transaction_log.name)", transactionName, transactionName)) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to construct query to remove transaction named %s from log.",
+        marla_logMessagef(session->server,
+            "Failed to construct query to remove transaction named %s from log.",
             transactionName
         );
         return parsegraph_ERROR;
     }
     dbrv = apr_dbd_query(dbd->driver, dbd->handle,  &nrows, buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Encountered database error while removing transaction named %s from the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
+        marla_logMessagef(session->server,
+            "Encountered database error while removing transaction named %s from the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
         return parsegraph_ERROR;
     }
     if(nrows != 1) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Unexpected number, %d that is, of transactions named %s removed from the log upon commit.", nrows, transactionName);
+        marla_logMessagef(session->server,
+            "Unexpected number, %d that is, of transactions named %s removed from the log upon commit.", nrows, transactionName);
         return parsegraph_ERROR;
     }
 
@@ -1925,8 +1910,8 @@ parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* d
         &nrows,
         buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to commit savepoint for transaction %s. [%s]",
+        marla_logMessagef(session->server,
+            "Failed to commit savepoint for transaction %s. [%s]",
             transactionName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
@@ -1936,16 +1921,17 @@ parsegraph_UserStatus parsegraph_commitTransaction(apr_pool_t* pool, ap_dbd_t* d
     return parsegraph_OK;
 }
 
-parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t* dbd, const char* transactionName)
+parsegraph_UserStatus parsegraph_rollbackTransaction(parsegraph_Session* session, const char* transactionName)
 {
-    //ap_log_perror(
-        //APLOG_MARK, APLOG_ERR, 0, pool, "Rolling back transaction %s", transactionName
+    ap_dbd_t* dbd = session->dbd;
+    //marla_logMessagef(session->server,
+        //"Rolling back transaction %s", transactionName
     //);
     int nrows = 0;
     char buf[1024];
     if(0 > snprintf(buf, sizeof(buf), "ROLLBACK TO '%s'", transactionName)) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, 0, pool, "Failed to roll back transaction %s!", transactionName
+        marla_logMessagef(session->server,
+            "Failed to roll back transaction %s!", transactionName
         );
         return parsegraph_ERROR;
     }
@@ -1956,8 +1942,8 @@ parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t*
         &nrows,
         buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to rollback savepoint for transaction %s. [%s]",
+        marla_logMessagef(session->server,
+            "Failed to rollback savepoint for transaction %s. [%s]",
             transactionName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
@@ -1973,8 +1959,8 @@ parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t*
         &nrows,
         buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to release savepoint for rolled back transaction %s. [%s]",
+        marla_logMessagef(session->server,
+            "Failed to release savepoint for rolled back transaction %s. [%s]",
             transactionName,
             apr_dbd_error(dbd->driver, dbd->handle, dbrv)
         );
@@ -1982,8 +1968,8 @@ parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t*
     }
 
     if(0 > snprintf(buf, sizeof(buf), "with r(value) as (select '%s') DELETE FROM transaction_log WHERE name = '%s' and level = (select count(*) - 1 from r join transaction_log on r.value = transaction_log.name)", transactionName, transactionName)) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Failed to construct query to remove transaction named %s from log.",
+        marla_logMessagef(session->server,
+            "Failed to construct query to remove transaction named %s from log.",
             transactionName
         );
         return parsegraph_ERROR;
@@ -1991,13 +1977,13 @@ parsegraph_UserStatus parsegraph_rollbackTransaction(apr_pool_t* pool, ap_dbd_t*
 
     dbrv = apr_dbd_query(dbd->driver, dbd->handle,  &nrows, buf);
     if(dbrv != 0) {
-        ap_log_perror(
-            APLOG_MARK, APLOG_ERR, dbrv, pool, "Encountered database error while removing transaction named %s from the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
+        marla_logMessagef(session->server,
+            "Encountered database error while removing transaction named %s from the log. Internal database error %d: %s", transactionName, dbrv, apr_dbd_error(dbd->driver, dbd->handle, dbrv));
         return parsegraph_ERROR;
     }
 
-    //ap_log_perror(
-        //APLOG_MARK, APLOG_ERR, 0, pool, "Rolled back transaction %s.", transactionName
+    //marla_logMessagef(session->server,
+        //"Rolled back transaction %s.", transactionName
     //);
 
     return parsegraph_OK;

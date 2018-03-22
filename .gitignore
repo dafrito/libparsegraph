@@ -8,10 +8,11 @@ lib*.so.*
 *.la
 
 # Build artifacts
-src/parsegraph_user_install
-src/parsegraph_user_config.h
-parsegraph_user.pc
-parsegraph_user.pc.head
+src/parsegraph_install
+src/parsegraph_config.h
+src/parsegraph_config.h.in
+parsegraph.pc
+parsegraph.pc.head
 
 # Autotools artifacts
 stamp*
@@ -40,6 +41,7 @@ rpm.sh
 ar-lib
 test-driver
 compile
+runtest_*
 
 # Dist artifacts
 *.tar.gz

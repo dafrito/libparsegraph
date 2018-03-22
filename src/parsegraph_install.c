@@ -1,55 +1,36 @@
 #include "parsegraph_user.h"
+#include "parsegraph_List.h"
 #include <stdio.h>
-#include <http_log.h>
 
-static apr_pool_t* pool = NULL;
-static ap_dbd_t* dbd;
-
-void ap_log_perror(
-    const char *  	file,
-    int  	line,
-    int  	module_index,
-    int  	level,
-    apr_status_t  	status,
-    apr_pool_t *  	p,
-    const char *  	fmt,
-    ...)
-{
-    va_list args;
-    va_start(args, fmt);
-    vfprintf(stderr, fmt, args);
-    va_end(args);
-    fprintf(stderr, "\n");
-}
+static parsegraph_Session* session = NULL;
 
 int main(int argc, const char* const* argv)
 {
     if(argc < 3) {
-        fprintf(stderr, "parsegraph_user " parsegraph_FULL_VERSION "\n");
-        fprintf(stderr, "usage: parsegraph_user_install {database_type} {connection_string}\n");
+        fprintf(stderr, "parsegraph " parsegraph_FULL_VERSION "\n");
+        fprintf(stderr, "usage: parsegraph_install {database_type} {connection_string}\n");
         return -1;
     }
-
     // Initialize the APR.
+    apr_pool_t* pool;
     apr_status_t rv;
     rv = apr_app_initialize(&argc, &argv, NULL);
     if(rv != APR_SUCCESS) {
         fprintf(stderr, "Failed initializing APR. APR status of %d.\n", rv);
         return -1;
     }
-    rv = apr_pool_create(&pool, NULL);
-    if(rv != APR_SUCCESS) {
-        fprintf(stderr, "Failed creating memory pool. APR status of %d.\n", rv);
+    if(APR_SUCCESS != apr_pool_create(&pool, 0)) {
+        fprintf(stderr, "Failed to create initial pool.\n");
         return -1;
     }
-
-    // Initialize DBD.
     rv = apr_dbd_init(pool);
     if(rv != APR_SUCCESS) {
         fprintf(stderr, "Failed initializing DBD, APR status of %d.\n", rv);
         return -1;
     }
-    dbd = (ap_dbd_t*)apr_palloc(pool, sizeof(ap_dbd_t));
+
+    // Initialize DBD.
+    ap_dbd_t* dbd = (ap_dbd_t*)apr_palloc(pool, sizeof(ap_dbd_t));
     if(dbd == NULL) {
         fprintf(stderr, "Failed initializing DBD memory");
         return -1;
@@ -67,11 +48,21 @@ int main(int argc, const char* const* argv)
     }
     dbd->prepared = apr_hash_make(pool);
 
-    rv = parsegraph_upgradeUserTables(pool, dbd);
+    session = parsegraph_Session_new(pool, dbd);
+
+    rv = parsegraph_upgradeUserTables(session);
     if(rv != 0) {
         fprintf(stderr, "Failed upgrading user tables, APR status of %d.\n", rv);
         return -1;
     }
+
+    rv = parsegraph_List_upgradeTables(session);
+    if(rv != 0) {
+        fprintf(stderr, "Failed upgrading user tables, APR status of %d.\n", rv);
+        return -1;
+    }
+
+    parsegraph_Session_destroy(session);
 
     // Close the DBD connection.
     rv = apr_dbd_close(dbd->driver, dbd->handle);
