@@ -7,6 +7,8 @@ lib*.so.*
 *.lo
 *.la
 
+*.sqlite
+
 # Build artifacts
 src/parsegraph_install
 src/parsegraph_config.h
