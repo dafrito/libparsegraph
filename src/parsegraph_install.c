@@ -1,5 +1,6 @@
 #include "parsegraph_user.h"
 #include "parsegraph_List.h"
+#include "parsegraph_environment.h"
 #include <stdio.h>
 
 static parsegraph_Session* session = NULL;
@@ -59,6 +60,12 @@ int main(int argc, const char* const* argv)
     rv = parsegraph_List_upgradeTables(session);
     if(rv != 0) {
         fprintf(stderr, "Failed upgrading user tables, APR status of %d.\n", rv);
+        return -1;
+    }
+
+    rv = parsegraph_upgradeEnvironmentTables(session);
+    if(rv != 0) {
+        fprintf(stderr, "Failed upgrading Environment tables, APR status of %d.\n", rv);
         return -1;
     }
 
