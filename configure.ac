@@ -1,8 +1,8 @@
 # Process this file with autoconf to produce a configure script.
 
 AC_PREREQ([2.68])
-AC_INIT([parsegraph], [1.2], [dafrito@gmail.com], [parsegraph], [https://rainback.com])
-AC_SUBST([PACKAGE_RELEASE], [2])
+AC_INIT([parsegraph], [1.3], [dafrito@gmail.com], [parsegraph], [https://rainback.com])
+AC_SUBST([PACKAGE_RELEASE], [1])
 AM_INIT_AUTOMAKE([-Wall foreign serial-tests subdir-objects])
 AC_CONFIG_SRCDIR([src/parsegraph_user.c])
 AC_CONFIG_HEADERS([src/parsegraph_config.h])
