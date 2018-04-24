@@ -2,73 +2,102 @@
 <html>
 <head>
 <title>parsegraph_user</title>
-<link rel="stylesheet" href="style.css">
+<link rel=stylesheet type=text/css href="../../doc/rainback.css">
 </head>
 <body>
-<nav class="toc">
+	<div class="grid">
+		<div class="logo">
+		<nav class="toc" style="clear: none; ">
+		<p style="text-align: center">
+		<a href=/><img id=logo src="../../doc/nav-side-logo.png"></img></a>
+		</p>
+		</nav>
+		</div>
+		<div class="block title">
+		<h1><h1>Server-User- <a href="index.html">Libparsegraph</a></h1>
+		</h1>
+		</div>
+		
+<div class="slot toctitle">
 <h2>parsegraph_user</h2>
 <ol>
-<li>const char* parsegraph_nameUserStatus(parsegraph_UserStatus rv)
-<li>int parsegraph_isSeriousUserError(parsegraph_UserStatus rv)
-<li>int parsegraph_userStatusToHttp(parsegraph_UserStatus rv)
-<li>parsegraph_prepareLoginStatements(pool, dbd)
-<li>parsegraph_upgradeUserTables(pool, dbd)
-<li>parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)
-<li>parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size)
-<li>parsegraph_createPasswordSalt(pool, size_t salt_len, char** password_salt_encoded)
-<li>parsegraph_encryptPassword(pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)
-<li>parsegraph_USERNAME_MAX_LENGTH
-<li>parsegraph_USERNAME_MIN_LENGTH
-<li>parsegraph_PASSWORD_MIN_LENGTH
-<li>parsegraph_PASSWORD_MAX_LENGTH
-<li>parsegraph_PASSWORD_SALT_LENGTH
-<li>parsegraph_SELECTOR_LENGTH
-<li>parsegraph_TOKEN_LENGTH
-<li>const char* parsegraph_constructSessionString(pool, const char* session_selector, const char* session_token)
-<li>parsegraph_deconstructSessionString(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token)
-<li>parsegraph_createNewUser(pool, dbd, const char* username, const char* password)
-<li>parsegraph_changeUserPassword(pool, dbd, const char* username, const char* password)
-<li>parsegraph_removeUser(pool, dbd, const char* username)
-<li>struct parsegraph_user_login
-<li>parsegraph_generateLogin(pool, username, struct parsegraph_user_login** createdLogin)
-<li>parsegraph_refreshUserLogin(pool, dbd, struct parsegraph_user_login* createdLogin)
-<li>parsegraph_beginUserLogin(pool, dbd, const char* username, const char* password, struct parsegraph_user_login** createdLogin)
-<li>parsegraph_endUserLogin(pool, dbd, const char* username, int* logins_ended)
-<li>parsegraph_listUsers(pool, dbd, apr_dbd_results_t** res)
-<li>parsegraph_getUser(pool, dbd, apr_dbd_results_t** res, const char* username)
-<li>parsegraph_getIdForUsername(pool, dbd, const char* username, int* user_id)
-<li>parsegraph_getUserProfile(pool, dbd, const char* username, const char** profile)
-<li>parsegraph_setUserProfile(pool, dbd, const char* username, const char* profile)
-<li>parsegraph_grantSuperadmin(pool, dbd, const char* username)
-<li>parsegraph_revokeSuperadmin(pool, dbd, const char* username)
-<li>parsegraph_hasSuperadmin(pool, dbd, const char* username, int* hasSuperadmin)
-<li>parsegraph_banUser(pool, dbd, const char* username)
-<li>parsegraph_unbanUser(pool, dbd, const char* username)
-<li>parsegraph_isBanned(pool, dbd, const char* username, int* isBanned)
+<li>const char* <a href="#parsegraph_nameUserStatus">parsegraph_nameUserStatus(parsegraph_UserStatus rv)</a>
+<li>int <a href="#parsegraph_isSeriousUserError">parsegraph_isSeriousUserError(parsegraph_UserStatus rv)</a>
+<li>int <a href="#parsegraph_userStatusToHttp">parsegraph_userStatusToHttp(parsegraph_UserStatus rv)</a>
+<li><a href="#parsegraph_prepareLoginStatements">parsegraph_prepareLoginStatements(pool, dbd)</a>
+<li><a href="#parsegraph_upgradeUserTables">parsegraph_upgradeUserTables(pool, dbd)</a>
+<li><a href="#parsegraph_validateUsername">parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)</a>
+<li><a href="#parsegraph_validatePassword">parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size)</a>
+<li><a href="#parsegraph_createPasswordSalt">parsegraph_createPasswordSalt</a>(pool, size_t salt_len, char** password_salt_encoded)
+<li><a href="#parsegraph_encryptPassword">parsegraph_encryptPassword</a>(pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)
+<li><a href="#parsegraph_USERNAME_MAX_LENGTH">parsegraph_USERNAME_MAX_LENGTH</a>
+<li><a href="#parsegraph_USERNAME_MIN_LENGTH">parsegraph_USERNAME_MIN_LENGTH</a>
+<li><a href="#parsegraph_PASSWORD_MIN_LENGTH">parsegraph_PASSWORD_MIN_LENGTH</a>
+<li><a href="#parsegraph_PASSWORD_MAX_LENGTH">parsegraph_PASSWORD_MAX_LENGTH</a>
+<li><a href="#parsegraph_PASSWORD_SALT_LENGTH">parsegraph_PASSWORD_SALT_LENGTH</a>
+<li><a href="#parsegraph_SELECTOR_LENGTH">parsegraph_SELECTOR_LENGTH</a>
+<li><a href="#parsegraph_TOKEN_LENGTH">parsegraph_TOKEN_LENGTH</a>
+<li>const char* <a href="#parsegraph_constructSessionString">parsegraph_constructSessionString(pool, const char* session_selector, const char* session_token)</a>
+<li><a href="#parsegraph_deconstructSessionString">parsegraph_deconstructSessionString(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token)</a>
+<li><a href="#parsegraph_createNewUser">parsegraph_createNewUser(pool, dbd, const char* username, const char* password)</a>
+<li><a href="#parsegraph_changeUserPassword">parsegraph_changeUserPassword(pool, dbd, const char* username, const char* password)</a>
+<li><a href="#parsegraph_removeUser">parsegraph_removeUser(pool, dbd, const char* username)</a>
+<li><a href="#structstruct"> parsegraph_user_login
+<li><a href="#parsegraph_generateLogin">parsegraph_generateLogin(pool, username, struct parsegraph_user_login** createdLogin)</a>
+<li><a href="#parsegraph_refreshUserLogin">parsegraph_refreshUserLogin(pool, dbd, struct parsegraph_user_login* createdLogin)</a>
+<li><a href="#parsegraph_beginUserLogin">parsegraph_beginUserLogin(pool, dbd, const char* username, const char* password, struct parsegraph_user_login** createdLogin)</a>
+<li><a href="#parsegraph_endUserLogin">parsegraph_endUserLogin(pool, dbd, const char* username, int* logins_ended)</a>
+<li><a href="#parsegraph_listUsers">parsegraph_listUsers(pool, dbd, apr_dbd_results_t** res)</a>
+<li><a href="#parsegraph_getUser">parsegraph_getUser(pool, dbd, apr_dbd_results_t** res, const char* username)</a>
+<li><a href="#parsegraph_getIdForUsername">parsegraph_getIdForUsername(pool, dbd, const char* username, int* user_id)</a>
+<li><a href="#parsegraph_getUserProfile">parsegraph_getUserProfile(pool, dbd, const char* username, const char** profile)</a>
+<li><a href="#parsegraph_setUserProfile">parsegraph_setUserProfile(pool, dbd, const char* username, const char* profile)</a>
+<li><a href="#parsegraph_grantSuperadmin">parsegraph_grantSuperadmin(pool, dbd, const char* username)</a>
+<li><a href="#parsegraph_revokeSuperadmin">parsegraph_revokeSuperadmin(pool, dbd, const char* username)</a>
+<li><a href="#parsegraph_hasSuperadmin">parsegraph_hasSuperadmin(pool, dbd, const char* username, int* hasSuperadmin)</a>
+<li><a href="#parsegraph_banUser">parsegraph_banUser(pool, dbd, const char* username)</a></
+<li><a href="#parsegraph_unbanUser">parsegraph_unbanUser(pool, dbd, const char* username)</a>
+<li><a href="#parsegraph_isBanned">parsegraph_isBanned(pool, dbd, const char* username, int* isBanned)</a>
 </ol>
-</nav>
+</div>
+<div class="block linksearch" style="font-size: 15px; width: 100%;">
+			<div class=links>
+       
+        	<a href=/login><span class="alphabud" style="background-color: greenyellow">Log in</span></a> 
+        <a href=/signup><span class="alphabud" style="background-color: gold">Sign up</span></a> 
+        <a href="/import"><span class="alphabud" style="align-content: right">Import</span></a>
 
-<main class="content">
+        <form id=search action="/search" style="width: %; float:right; display: inline-block;">
+
+        <input name=q></input> <input type=submit value=Search></input>
+        </form>
+
+    	</div>
+		</div>
+<div class="block content" style="font-size: 16px;">
 <h1>parsegraph_user</h1>
 <pre>
 #include &lt;parsegraph_user.h&gt;
 </pre>
-<h2>const char* parsegraph_nameUserStatus(parsegraph_UserStatus rv)</h2>
+<h2>const char* <a name="parsegraph_nameUserStatus">parsegraph_nameUserStatus
+(parsegraph_UserStatus rv)</a></h2>
 Returns a user-friendly string describing the given user status.
-<h2>int parsegraph_isSeriousUserError(parsegraph_UserStatus rv)</h2>
+<h2>int <a name="parsegraph_isSeriousUserError">parsegraph_isSeriousUserError
+(parsegraph_UserStatus rv)</a></h2>
 Returns 1 if the given error is indicative of a programming problem, rather than just an error
 that the user could normally generate; return 0 for non-serious errors.
-<h2>int parsegraph_userStatusToHttp(parsegraph_UserStatus rv)</h2>
+<h2>int <a name="parsegraph_userStatusToHttp">parsegraph_userStatusToHttp
+(parsegraph_UserStatus rv)</a></h2>
 Returns an HTTP status that normally represents the given status.
-<h2>parsegraph_prepareLoginStatements(pool, dbd)</h2>
+<h2><a name="parsegraph_prepareLoginStatements">parsegraph_prepareLoginStatements(pool, dbd)</a></h2>
 Prepares SQL statements for use by this module.<p>Call this function once per DBD before use.
-<h2>parsegraph_upgradeUserTables(pool, dbd)</h2>
+<h2><a name="parsegraph_upgradeUserTables">parsegraph_upgradeUserTables(pool, dbd)</a></h2>
 Creates or upgrades the User SQL tables in the given DBD instance.
 <p>
 Call this function once per DBD before use, unless it is known that the SQL tables do not need to be created or upgraded.
 <p>
 Transactional.
-<h2>parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)</h2>
+<h2><a name="parsegraph_validateUsername">parsegraph_validateUsername(apr_pool_t* pool, const char* username, size_t* username_size)</a></h2>
 Returns parsegraph_OK if the given username is valid for insertion. The length of the given username in bytes is stored in username_size.
 <ul>
 <li>Returns parsegraph_USERNAME_NO_SPACES failure code if the given username contains spaces.
@@ -78,40 +107,41 @@ Returns parsegraph_OK if the given username is valid for insertion. The length o
 <li>Returns parsegraph_USERNAME_TOO_LONG if the length of the given username is greater than parsegraph_USERNAME_MAX_LENGTH characters.
 <li>Returns parsegraph_ERROR if the given username is null.
 </ul>
-<h2>parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size)</h2>
+<h2><a name="parsegraph_validatePassword">parsegraph_validatePassword(apr_pool_t* pool, const char* password, size_t* password_size)</a></h2>
 Returns parsegraph_OK if the given password is suitable for insertion. The password's length in bytes is returned in password_size.
 <ul>
 <li>Returns parsegraph_ERROR if the given password is null.
 <li>Returns parsegraph_PASSWORD_TOO_LONG if the given password is greater than parsegraph_PASSOWRD_MAX_LENGTH characters.
 <li>Returns parsegraph_PASSWORD_TOO_SHORT if the given password is less than parsegraph_PASSOWRD_MIN_LENGTH characters.
 </ul>
-<h2>parsegraph_createPasswordSalt(pool, size_t salt_len, char** password_salt_encoded)</h2>
+<h2><a name="parsegraph_createPasswordSalt">parsegraph_createPasswordSalt(pool, size_t salt_len, char** password_salt_encoded)</a></h2>
 Create a new password salt.
-<h2>parsegraph_encryptPassword(pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)</h2>
+<h2><a name="parsegraph_encryptPassword">parsegraph_encryptPassword(pool, const char* password, size_t password_size, char** password_hash_encoded, const char* password_salt_encoded, size_t password_salt_encoded_size)</a></h2>
 Returns an encrypted hash for the given password, along with the password salt used in that hash. Both the salt and the hash are base64 encoded and null-terminated.
-<h2>parsegraph_USERNAME_MAX_LENGTH</h2>
+<h2><a name="parsegraph_USERNAME_MAX_LENGTH">parsegraph_USERNAME_MAX_LENGTH</a></h2>
 The maximum length, in bytes, of a valid username.
-<h2>parsegraph_USERNAME_MIN_LENGTH</h2>
+<h2><a name="parsegraph_USERNAME_MIN_LENGTH">parsegraph_USERNAME_MIN_LENGTH</a></h2>
 The minimum length, in bytes, of a valid username.
-<h2>parsegraph_PASSWORD_MIN_LENGTH</h2>
+<h2><a name="parsegraph_PASSWORD_MIN_LENGTH">parsegraph_PASSWORD_MIN_LENGTH</a></h2>
 The minimum length, in bytes, of a valid password.
-<h2>parsegraph_PASSWORD_MAX_LENGTH</h2>
+<h2><a name="parsegraph_PASSWORD_MAX_LENGTH">parsegraph_PASSWORD_MAX_LENGTH</a></h2>
 The maximum length, in bytes, of a valid password.
-<h2>parsegraph_PASSWORD_SALT_LENGTH</h2>
+<h2><a name="parsegraph_PASSWORD_SALT_LENGTH">parsegraph_PASSWORD_SALT_LENGTH</a></h2>
 The length in bytes of the password salt string.
-<h2>parsegraph_SELECTOR_LENGTH</h2>
+<h2><a name="parsegraph_SELECTOR_LENGTH">parsegraph_SELECTOR_LENGTH</a></h2>
 The length in bytes of the login selector string.
-<h2>parsegraph_TOKEN_LENGTH</h2>
+<h2><a name="parsegraph_TOKEN_LENGTH">parsegraph_TOKEN_LENGTH</a></h2>
 The length in bytes of the login token string.
-<h2>const char* parsegraph_constructSessionString(pool, const char* session_selector, const char* session_token)</h2>
+<h2>const char* <a name="parsegraph_constructSessionString">parsegraph_constructSessionString(pool, const char* session_selector, const char* session_token)</a></h2>
 Returns a pool-allocated string representing the given login selector and token credentials.
-<h2>parsegraph_deconstructSessionString(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token)</h2>
+<h2><a name="parsegraph_deconstructSessionString">parsegraph_deconstructSessionString
+(apr_pool_t* pool, const char* sessionValue, const char** session_selector, const char** session_token)</a></h2>
 Reverses a session string to produce the login selector and token credentials.
 <ul>
 <li>Returns parsegraph_SESSION_MALFORMED if the session string could not be parsed.
 <li>Returns parsegraph_OK if the session string could be parsed.
 </ul>
-<h2>parsegraph_createNewUser(pool, dbd, const char* username, const char* password)</h2>
+<h2><a name="parsegraph_createNewUser">parsegraph_createNewUser(pool, dbd, const char* username, const char* password)</a></h2>
 Creates a new user with the given username and password.
 <ul>
 <li>Returns any appropriate username and password validation error.
@@ -119,7 +149,7 @@ Creates a new user with the given username and password.
 <li>Returns parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement is not defined.
 <li>Returns parsegraph_ERROR if the query fails to insert the user.
 </ul>
-<h2>parsegraph_changeUserPassword(pool, dbd, const char* username, const char* password)</h2>
+<h2>parsegraph_changeUserPassword(pool, dbd, const char* username, const char* password)</h2></h2>
 Changes the specified user's password.
 <ul>
 <li>Returns any appropriate username and password validation error.
@@ -128,7 +158,7 @@ Changes the specified user's password.
 <li>Returns parsegraph_ERROR if if the generated password salt is null, if the query fails to execute, or if the password is not changed despite the query.
 <li>Returns parsegraph_OK if the password is changed successfully.
 </ul>
-<h2>parsegraph_removeUser(pool, dbd, const char* username)</h2>
+<h2>parsegraph_removeUser(pool, dbd, const char* username)</h2></h2>
 Ends the user's logins and deletes the specified user.
 <ul>
 <li>Returns a user validation error if the username fails to validate.
@@ -137,7 +167,7 @@ Ends the user's logins and deletes the specified user.
 <li>Returns parsegraph_ERROR if the removal query fails to execute, or if an unexpected number of users are removed.
 <li>Returns parsegraph_OK if zero or one user was successfuly removed.
 </ul>
-<h2>struct parsegraph_user_login</h2>
+<h2>struct<a name=" parsegraph_user_login"> parsegraph_user_login</a></h2>
 Represents a user's login session.
 <p>
 <table>
@@ -146,13 +176,13 @@ Represents a user's login session.
 <tr><td>session_selector<td>Selector part of this login.</tr>
 <tr><td>session_token<td>Token part of this login.</tr>
 </table>
-<h2>parsegraph_generateLogin(pool, username, struct parsegraph_user_login** createdLogin)</h2>
+<h2><a name="parsegraph_generateLogin">parsegraph_generateLogin(pool, username, struct parsegraph_user_login** createdLogin)</a></h2>
 Creates a pool-allocated login for the specified user, returning it in the given pointer.
 <ul>
 <li>Returns parsegraph_ERROR on error creating the login.
 <li>Returns parsegraph_OK if the login was generated.
 </ul>
-<h2>parsegraph_refreshUserLogin(pool, dbd, struct parsegraph_user_login* createdLogin)</h2>
+<h2><a name="parsegraph_refreshUserLogin">parsegraph_refreshUserLogin(pool, dbd, struct parsegraph_user_login* createdLogin)</a></h2>
 Refreshes the specified login, causing its expiration to be renewed.
 <p>
 The username is also refreshed in the login.
@@ -161,7 +191,7 @@ The username is also refreshed in the login.
 <li>Returns parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement is not defined.
 <li>Returns parsegraph_SESSION_DOES_NOT_EXIST if the specified login does not exist.
 </ul>
-<h2>parsegraph_beginUserLogin(pool, dbd, const char* username, const char* password, struct parsegraph_user_login** createdLogin)</h2>
+<h2><a name="parsegraph_beginUserLogin">parsegraph_beginUserLogin(pool, dbd, const char* username, const char* password, struct parsegraph_user_login** createdLogin)</a></h2>
 Begins a new login for the named user, confirming the password along the way.
 <p>
 Transactional.
@@ -172,7 +202,7 @@ Transactional.
 <li>Returns parsegraph_ERROR if any query fails to execute, or no login is inserted despite the query, or if an unexpected number of logins are created, or if a login object fails to be creareated.
 <li>Returns parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement is not defined.
 </ul>
-<h2>parsegraph_endUserLogin(pool, dbd, const char* username, int* logins_ended)</h2>
+<h2><a name="parsegraph_endUserLogin">parsegraph_endUserLogin(pool, dbd, const char* username, int* logins_ended)</a></h2>
 Ends all the specified user's logins.
 <ul>
 <li>Returns any appropriate username validation error for the given username.
@@ -180,21 +210,21 @@ Ends all the specified user's logins.
 <li>Returns parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement is not defined.
 <li>Returns parsegraph_OK if the specified user's login is ended.
 </ul>
-<h2>parsegraph_listUsers(pool, dbd, apr_dbd_results_t** res)</h2>
+<h2><a name="parsegraph_listUsers">parsegraph_listUsers(pool, dbd, apr_dbd_results_t** res)</a></h2>
 Returns the result set of all users.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_getUser(pool, dbd, apr_dbd_results_t** res, const char* username)</h2>
+<h2><a name="parsegraph_getUser">parsegraph_getUser(pool, dbd, apr_dbd_results_t** res, const char* username)</a></h2>
 Returns the result set for the specified user.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_getIdForUsername(pool, dbd, const char* username, int* user_id)</h2>
+<h2>parsegraph_getIdForUsername(pool, dbd, const char* username, int* user_id)</h2></h2>
 Retrieves the specified user's id.
 <ul>
 <li>Results parsegraph_USER_DOES_NOT_EXIST if the specified user does not exist.
@@ -202,7 +232,7 @@ Retrieves the specified user's id.
 <li>Results parsegraph_ERROR on database error.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_getUserProfile(pool, dbd, const char* username, const char** profile)</h2>
+<h2><a name="parsegraph_getUserProfile">parsegraph_getUserProfile(pool, dbd, const char* username, const char** profile)</a></h2>
 Retrieves the specified user's profile.
 <ul>
 <li>Results parsegraph_USER_DOES_NOT_EXIST if the specified user does not exist.
@@ -210,28 +240,28 @@ Retrieves the specified user's profile.
 <li>Results parsegraph_ERROR on database error.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_setUserProfile(pool, dbd, const char* username, const char* profile)</h2>
+<h2><a name="parsegraph_setUserProfile">parsegraph_setUserProfile(pool, dbd, const char* username, const char* profile)</a></h2>
 Sets the specified user's profile to the given value.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_grantSuperadmin(pool, dbd, const char* username)</h2>
+<h2><a name="parsegraph_grantSuperadmin">parsegraph_grantSuperadmin(pool, dbd, const char* username)</a></h2>
 Grant super-administrator rights to the specified user.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_revokeSuperadmin(pool, dbd, const char* username)</h2>
+<h2><a name="parsegraph_revokeSuperadmin">parsegraph_revokeSuperadmin(pool, dbd, const char* username)</a></h2>
 Revokes super-administrator rights from the specified user.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_hasSuperadmin(pool, dbd, const char* username, int* hasRights)</h2>
+<h2><a name="parsegraph_hasSuperadmin">parsegraph_hasSuperadmin(pool, dbd, const char* username, int* hasRights)</a></h2>
 Retrieves, using hasRights, whether the specified user is a super administrator.
 <ul>
 <li>Returns parsegraph_OK on success.
@@ -239,21 +269,21 @@ Retrieves, using hasRights, whether the specified user is a super administrator.
 <li>Returns parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Returns parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_banUser(pool, dbd, const char* username)</h2>
+<h2><a name="parsegraph_banUser">parsegraph_banUser(pool, dbd, const char* username)</a></h2>
 Bans the user.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_unbanUser(pool, dbd, const char* username)</h2>
+<h2><a name="parsegraph_unbanUser">parsegraph_unbanUser(pool, dbd, const char* username)</a></h2>
 Unban the specified user.
 <ul>
 <li>Results parsegraph_OK on success.
 <li>Results parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Results parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-<h2>parsegraph_isBanned(pool, dbd, const char* username, int* isBanned)</h2>
+<h2><a name="parsegraph_isBanned">parsegraph_isBanned(pool, dbd, const char* username, int* isBanned)</a></h2>
 Retrieves, using isBanned, whether the specified user is banned.
 <ul>
 <li>Returns parsegraph_OK on success.
@@ -261,6 +291,9 @@ Retrieves, using isBanned, whether the specified user is banned.
 <li>Returns parsegraph_ERROR on database error, or if an unexpected number of profiles are changed.
 <li>Returns parsegraph_UNDEFINED_PREPARED_STATEMENT if a needed prepared statement was not defined.
 </ul>
-</main>
+</div>
+<div class="footer slot style="display: inline-block; "">
+    &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved. <a href=/contact><span class="bud">Contact Us</span></a>
+</div>
 </body>
 </html>

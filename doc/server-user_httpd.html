@@ -2,36 +2,54 @@
 <html>
 <head>
 <title>parsegraph_user_httpd</title>
-<link rel="stylesheet" href="style.css">
+<link rel=stylesheet type=text/css href="../../doc/rainback.css">
 </head>
 <body>
-<main class="content">
-<h2>parsegraph_user_httpd</h2>
-User functions for use with Apache httpd modules.
-<h3>parsegraph_authenticate(request_rec* r, struct parsegraph_user_login* createdLogin)</h3>
-Authenticates the cookie provided in the given request, storing the result of authentication
-in <code>createdLogin</code>.
-<p>
-Transactional.
-<ul>
-<li>Returns parsegraph_OK if the user was authenticated.
-<li>Returns parsegraph_ERROR if a serious error occurs during authentication.
-<li>Returns parsegraph_SESSION_DOES_NOT_EXIST if the session was not given.
-<li>Returns parsegraph_SESSION_DOES_NOT_MATCH if the session is invalid.
-</ul>
-<h3>apr_status_t parsegraph_removeSession(request_rec* r);</h3>
-Removes the session cookie from the given request.
-<p>
-HttpOnly;Max-Age=315360000;
-<h3>apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin);</h3>
-Sets the session cookie for the given request to the given login.
-</main>
-<nav class="toc">
-<h2>parsegraph_user_httpd</h2>
-<ol>
-<li>parsegraph_authenticate(request_rec* r, struct parsegraph_user_login* createdLogin)
-<li>apr_status_t parsegraph_removeSession(request_rec* r);
-<li>apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin);
-</nav>
+	<div class="indexgrid":>
+		<div class="logo" style="align-items: center;">
+		<nav class="toc" style="clear: none">
+		<p style="text-align: center">
+		<a href=/><img id=logo src="../../doc/nav-side-logo.png"></img></a>
+		</p>
+		</nav>
+		</div>
+		<div class="block linksearch" style="font-size: 15px; width: 100%;">
+			<div class=links>
+			<a href=/login><span class="bud" style="background-color: greenyellow">Log in</span></a> 
+        <a href=/signup><span class="bud" style="background-color: gold">Sign up</span></a> 
+        <a href="/import"><span class="bud" style="align-content: right">Import</span></a>
+       <form id=search action="/search" style="width: %; float:right; display: inline-block;">
+
+        <input name=q></input> <input type=submit value=Search></input>
+        </form>
+         
+    	</div>
+		</div>
+		<div class="slot blurb" style="width: 100%;">
+		</div>
+		<div class="block content">
+		<h2>parsegraph_user_httpd</h2>
+		User functions for use with Apache httpd modules.
+		<h3>parsegraph_authenticate(request_rec* r, struct parsegraph_user_login* createdLogin)</h3>
+		Authenticates the cookie provided in the given request, storing the result of authentication
+		in <code>createdLogin</code>.
+		Transactional.
+		<ul>
+		<li>Returns parsegraph_OK if the user was authenticated.
+		<li>Returns parsegraph_ERROR if a serious error occurs during authentication.
+		<li>Returns parsegraph_SESSION_DOES_NOT_EXIST if the session was not given.
+		<li>Returns parsegraph_SESSION_DOES_NOT_MATCH if the session is invalid.
+		</ul>
+		<h3>apr_status_t parsegraph_removeSession(request_rec* r);</h3>
+		Removes the session cookie from the given request.
+		<p>
+		HttpOnly;Max-Age=315360000;
+		<h3>apr_status_t parsegraph_setSession(request_rec* r, struct parsegraph_user_login* createdLogin);</h3>
+		Sets the session cookie for the given request to the given login.
+		</div>
+		<div class="footer slot style="display: inline-block; "">
+    &copy; 2018 <a href='https://rainback.com'>Rainback, Inc.</a> All rights reserved. <a href=/contact><span class="bud">Contact Us</span></a>
+		</div>
+	</div>
 </body>
 </html>
