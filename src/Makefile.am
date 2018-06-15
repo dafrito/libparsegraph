@@ -12,6 +12,8 @@ libparsegraph_la_SOURCES = \
 	session.c \
 	parsegraph_user.c \
 	parsegraph_List.c \
+	parsegraph_Grammar.c \
+	parsegraph_Grammar.h \
 	parsegraph_environment.c \
 	storage.c \
 	database.c \
@@ -60,6 +62,17 @@ runtest_environment_LDADD = libparsegraph.la
 
 runtest_environment_SOURCES = \
 	tests/test_environment.c \
+	tests/unity.c
+
+check_PROGRAMS += runtest_grammar
+runtest_grammar_CFLAGS = \
+	$(libparsegraph_la_CFLAGS) \
+	-I$(top_SRCDIR)
+runtest_grammar_LDFLAGS = $(libparsegraph_la_LDFLAGS)
+runtest_grammar_LDADD = libparsegraph.la
+
+runtest_grammar_SOURCES = \
+	tests/test_grammar.c \
 	tests/unity.c
 
 dist_check_SCRIPTS = tests/test_parsegraph_install.sh tests/unity.h tests/unity_internals.h
